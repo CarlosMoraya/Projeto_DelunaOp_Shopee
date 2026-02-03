@@ -59,6 +59,8 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
                     driver: row.Motorista,
                     hub: String(row.Bases || 'S/H'),
                     coordinator: String(row.Coordenador || 'S/C'),
+                    leader: String(row.Lider || ''),
+                    locality: String(row.Localidade || ''),
                     atCode: String(row.AT || ''),
                     atQuantity: atQuantity,
                     failures: Math.max(0, atQuantity - delivered),

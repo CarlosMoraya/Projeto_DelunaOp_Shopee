@@ -30,9 +30,9 @@ const App: React.FC = () => {
       case AppView.DELIVERY_SUCCESS:
         return <DeliverySuccess startDate={startDate} endDate={endDate} />;
       case AppView.COMPARATIVO:
-        return <Comparativo />;
+        return <Comparativo startDate={startDate} endDate={endDate} />;
       case AppView.COMPARATIVO_ATS:
-        return <ComparativoATs />;
+        return <ComparativoATs startDate={startDate} endDate={endDate} />;
       case AppView.QLP_MANAGEMENT:
         return <QLPManagement />;
       case AppView.PROTAGONISMO:

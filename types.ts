@@ -51,6 +51,8 @@ export interface RawDeliveryRow {
   'Mês': string;
   Entregues: string | number;
   Coordenador: string;
+  Lider: string;
+  Localidade: string;
 }
 
 export interface DeliveryData {
@@ -59,6 +61,8 @@ export interface DeliveryData {
   driver: string;
   hub: string;
   coordinator: string;
+  leader: string;
+  locality: string;
   atCode: string;
   atQuantity: number;
   failures: number;
