@@ -1,0 +1,14 @@
+# Project Rules
+
+1. **Context Awareness**: You MUST completely understand the project context and design system before proposing or executing task.
+   - Read `project_context.md` for project overview, tech stack, and navigation structure.
+   - Read `design_system.md` for color palette, typography, and component standards.
+
+2. **Design Compliance**:
+   - Use the variables defined in `design_system.md` (e.g., `deluna-primary`, `Font Jakarta`, etc.).
+   - Follow the established component patterns (Tables, Cards, Sidebar).
+
+3. **Tech Stack**:
+   - Framework: React 19
+   - Styling: Tailwind CSS
+   - Charts: Recharts

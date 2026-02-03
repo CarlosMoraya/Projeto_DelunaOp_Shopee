@@ -30,3 +30,39 @@ export interface DriverPerformance {
   delivered: number;
   status: 'Success' | 'Pending' | 'High Failure';
 }
+
+export interface RawDeliveryRow {
+  Bases: string;
+  Date: string;
+  ID: string | number;
+  Motorista: string;
+  AT: string | number;
+  Ciclo: string;
+  Remessas: string | number;
+  Insucessos: string | number;
+  Pendentes: string | number;
+  D0: string | number;
+  D1: string | number;
+  D2: string | number;
+  Performance: string | number;
+  Status: string;
+  Semana: string;
+  'Dia da Semana': string;
+  'Mês': string;
+  Entregues: string | number;
+  Coordenador: string;
+}
+
+export interface DeliveryData {
+  date: string;
+  id: string;
+  driver: string;
+  hub: string;
+  coordinator: string;
+  atCode: string;
+  atQuantity: number;
+  failures: number;
+  delivered: number;
+  successRate: number;
+  status: 'META ALCANÇADA' | 'PRÓX DA META' | 'ABAIXO DA META';
+}

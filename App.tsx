@@ -14,12 +14,21 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DELIVERY_SUCCESS);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Estados globais de data
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   const renderView = () => {
     switch (currentView) {
       case AppView.DELIVERY_SUCCESS:
-        return <DeliverySuccess />;
+        return <DeliverySuccess startDate={startDate} endDate={endDate} />;
       case AppView.COMPARATIVO:
         return <Comparativo />;
       case AppView.COMPARATIVO_ATS:
@@ -42,15 +51,22 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen overflow-hidden font-display">
-      <Sidebar 
-        currentView={currentView} 
-        onNavigate={handleNavigate} 
-        isOpen={isSidebarOpen} 
-        onClose={() => setIsSidebarOpen(false)} 
+      <Sidebar
+        currentView={currentView}
+        onNavigate={handleNavigate}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
-      
+
       <main className="flex-1 flex flex-col overflow-y-auto bg-[#F8FAFC]">
-        <Header currentView={currentView} onMenuClick={toggleSidebar} />
+        <Header
+          currentView={currentView}
+          onMenuClick={toggleSidebar}
+          startDate={startDate}
+          endDate={endDate}
+          setStartDate={setStartDate}
+          setEndDate={setEndDate}
+        />
         <div className="flex-1">
           {renderView()}
         </div>
@@ -58,8 +74,8 @@ const App: React.FC = () => {
 
       {/* Overlay para fechar sidebar no mobile */}
       {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden" 
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}

@@ -242,7 +242,6 @@ const PodiumCard: React.FC<{ rank: number; data: CampanhaRow; color: string; bor
       <p className={`text-[9px] font-black uppercase ${primary ? 'text-[#95D5B2]' : 'text-slate-400'}`}>Total Acumulado</p>
       <p className={`text-2xl font-black font-manrope`}>
         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.total)}
-      }
       </p>
     </div>
   </div>
