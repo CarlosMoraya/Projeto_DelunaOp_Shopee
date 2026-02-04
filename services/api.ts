@@ -223,7 +223,7 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
         if (Array.isArray(rawNotes)) {
             rawNotes.forEach((row, idx) => {
                 // Tenta pegar a base (geralmente a pergunta de qual é a base)
-                const baseRaw = getVal(row, 'BASE', 'BASES', 'QUAL A SUA BASE', 'QUAL A BASE');
+                const baseRaw = getVal(row, 'BASE_OP', 'BASE', 'BASES', 'QUAL A SUA BASE', 'QUAL A BASE');
                 const base = String(baseRaw || '').toUpperCase().trim();
 
                 // Tenta pegar a nota
