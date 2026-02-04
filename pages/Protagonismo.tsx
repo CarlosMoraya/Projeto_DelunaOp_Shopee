@@ -171,8 +171,11 @@ const Protagonismo: React.FC = () => {
                         <td className="px-6 py-4 font-bold text-slate-400 border-r border-slate-100 italic">{row.localidade}</td>
                         <td className="px-6 py-4 font-semibold border-r border-slate-100 uppercase tracking-tight">{row.lider}</td>
                         <td className="px-6 py-4 font-medium border-r border-slate-100 text-slate-500 uppercase text-[10px] tracking-wider">{row.coord}</td>
-                        <td className={`px-6 py-4 text-center font-black text-base ${row.resultado > 0 ? 'bg-slate-100/50 text-deluna-primary' : 'bg-slate-50/30 text-slate-300'}`}>
+                        <td className={`px-6 py-4 text-center font-black text-base ${(row as any)._debug_count > 0 ? 'bg-slate-100/50 text-deluna-primary' : 'bg-slate-50/30 text-slate-300'}`}>
                           {row.resultado.toFixed(1)}
+                          {(row as any)._debug_count > 0 && (
+                            <span className="block text-[8px] opacity-30 font-normal">{(row as any)._debug_count} avaliações</span>
+                          )}
                         </td>
                       </tr>
                     ))

@@ -155,12 +155,22 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
 };
 const getVal = (row: any, ...keys: string[]) => {
     const rowKeys = Object.keys(row);
+    const normalize = (s: string) => s.toUpperCase().replace(/[\s_|-]/g, '');
+
     for (const k of keys) {
-        const normalizedK = k.toUpperCase().replace(/\s+/g, '');
-        const found = rowKeys.find(rk => rk.toUpperCase().replace(/\s+/g, '') === normalizedK);
+        const normalizedK = normalize(k);
+        const found = rowKeys.find(rk => normalize(rk) === normalizedK);
         if (found) return row[found];
     }
     return '';
+};
+
+// Helper for numeric conversion (handles commas)
+const parseNum = (val: any): number => {
+    if (val === undefined || val === null || val === '') return NaN;
+    if (typeof val === 'number') return val;
+    const clean = String(val).replace(',', '.').trim();
+    return parseFloat(clean);
 };
 
 export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Promise<any[]> => {
@@ -198,9 +208,10 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
         if (!notesRes.ok) throw new Error(`Erro HTTP ao buscar Notas: ${notesRes.status}`);
 
         const rawNotes = await notesRes.json();
-        console.log("DEBUG Protagonismo: Resposta Respostas:", rawNotes);
+        console.log("DEBUG Protagonismo: Total de notas recebidas:", rawNotes.length);
         if (rawNotes.length > 0) {
             console.log("DEBUG Protagonismo: Colunas da aba Respostas:", Object.keys(rawNotes[0]));
+            console.log("DEBUG Protagonismo: Amostra da primeira nota:", rawNotes[0]);
         }
 
         if (!Array.isArray(rawNotes)) {
@@ -210,10 +221,16 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
         // 3. Agrupar notas por base (média)
         const notesMap = new Map<string, { sum: number, count: number }>();
         if (Array.isArray(rawNotes)) {
-            rawNotes.forEach(row => {
-                const base = String(getVal(row, 'BASE', 'BASES') || '').toUpperCase().trim();
+            rawNotes.forEach((row, idx) => {
+                // Tenta pegar a base (geralmente a pergunta de qual é a base)
+                const baseRaw = getVal(row, 'BASE', 'BASES', 'QUAL A SUA BASE', 'QUAL A BASE');
+                const base = String(baseRaw || '').toUpperCase().trim();
+
+                // Tenta pegar a nota
                 const rawNota = getVal(row, 'NOTA_PROTAGONISMO', 'NOTA PROTAGONISMO', 'NOTA', 'PONTUAÇÃO', 'PONTOS');
-                const nota = Number(rawNota);
+                const nota = parseNum(rawNota);
+
+                if (idx === 0) console.log(`DEBUG Check: Base="${base}", Nota="${nota}" (original="${rawNota}")`);
 
                 if (base && !isNaN(nota)) {
                     if (!notesMap.has(base)) notesMap.set(base, { sum: 0, count: 0 });
@@ -230,7 +247,8 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
             const avg = stats ? stats.sum / stats.count : 0;
             return {
                 ...b,
-                resultado: avg
+                resultado: avg,
+                _debug_count: stats ? stats.count : 0 // Adicionado para debug
             };
         });
 
