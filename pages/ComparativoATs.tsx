@@ -218,10 +218,28 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
   const totals = useMemo(() => {
     if (baseMetrics.length === 0) return null;
 
+    // Agregar dados diários globais para calcular Média e Máximo reais do Total Geral
+    const dailyGlobalMap = new Map<string, Set<string>>();
+    currentPeriodData.forEach(row => {
+      const dayKey = row.date;
+      const daySet = dailyGlobalMap.get(dayKey) || new Set<string>();
+      if (row.atCode && row.atCode !== '') {
+        daySet.add(`${row.hub}-${row.atCode}`);
+      } else {
+        daySet.add(`${row.hub}-row-${row.id}-${Math.random()}`);
+      }
+      dailyGlobalMap.set(dayKey, daySet);
+    });
+
+    const dailyCounts = Array.from(dailyGlobalMap.values()).map(set => set.size);
+    const totalATs = dailyCounts.reduce((a, b) => a + b, 0);
+    const numDays = dailyCounts.length;
+
+    const totalCarrMed = numDays > 0 ? Math.round(totalATs / numDays) : 0;
+    const totalCarrMax = dailyCounts.length > 0 ? Math.max(...dailyCounts) : 0;
+
     const totalPrev = baseMetrics.reduce((sum, item) => sum + item.prevTotal, 0);
     const totalCurr = baseMetrics.reduce((sum, item) => sum + item.currTotal, 0);
-    const totalCarrMed = Math.round(baseMetrics.reduce((acc, b) => acc + b.carrMed, 0) / baseMetrics.length); // Média das médias
-    const totalCarrMax = Math.max(...baseMetrics.map(b => b.carrMax)); // Máximo absoluto
 
     return {
       carrMed: totalCarrMed,
@@ -229,7 +247,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
       prev: totalPrev,
       curr: totalCurr
     };
-  }, [baseMetrics]);
+  }, [baseMetrics, currentPeriodData]);
 
 
   const formatNum = (val: number) => val.toLocaleString('pt-BR');

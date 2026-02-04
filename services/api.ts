@@ -1,10 +1,11 @@
 
-import { RawDeliveryRow, DeliveryData } from '../types';
+import { RawDeliveryRow, DeliveryData, RawQLPRow, QLPData } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
 
 const CACHE_KEY = 'delivery_data_cache_v5';
+const QLP_CACHE_KEY = 'qlp_data_cache_v1';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promise<DeliveryData[]> => {
@@ -87,5 +88,151 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
     } catch (error) {
         console.error("Falha ao buscar dados de delivery:", error);
         return [];
+    }
+};
+
+export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLPData[]> => {
+    try {
+        const cached = localStorage.getItem(QLP_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                return data;
+            }
+        }
+
+        const response = await fetch(`${url}?tab=QLP`);
+        if (!response.ok) throw new Error(`Erro na API QLP: ${response.statusText}`);
+
+        const rawData: any[] = await response.json();
+        console.log("DEBUG QLP: Recebido", rawData.length, "linhas");
+        if (rawData.length > 0) {
+            console.log("DEBUG QLP: Colunas detectadas:", Object.keys(rawData[0]));
+        }
+
+        // Função auxiliar para pegar valor de chave ignorando case e espaços
+        const getVal = (row: any, ...keys: string[]) => {
+            const rowKeys = Object.keys(row);
+            for (const k of keys) {
+                const normalizedK = k.toUpperCase().replace(/\s+/g, '');
+                const found = rowKeys.find(rk => rk.toUpperCase().replace(/\s+/g, '') === normalizedK);
+                if (found) return row[found];
+            }
+            return '';
+        };
+
+        const processed = rawData
+            .filter(row => {
+                const cliente = String(getVal(row, 'Q CLENTE', 'CLIENTE') || '').toUpperCase().trim();
+                const base = String(getVal(row, 'BASE') || '').toUpperCase().trim();
+
+                const isShopee = cliente === 'SHOPEE';
+                const isNotBonsucesso = !base.includes('XPT BONSUCESSO');
+
+                return isShopee && isNotBonsucesso;
+            })
+            .map(row => ({
+                base: String(getVal(row, 'BASE') || ''),
+                placa: String(getVal(row, 'PLACA') || ''),
+                nome: String(getVal(row, 'NOME') || ''),
+                situacaoCnh: String(getVal(row, 'SITUAÇÃO CNH', 'CNH') || ''),
+                situacaoMotorista: String(getVal(row, 'SITUAÇÃO MOTORISTA', 'MOTORISTA') || ''),
+                tipoVeiculo: String(getVal(row, 'TIPO DO VEÍCULO', 'TIPO VEICULO') || ''),
+                situacaoGrPlaca: String(getVal(row, 'SITUAÇÃO GR PLACA', 'GR PLACA') || ''),
+                cliente: String(getVal(row, 'Q CLENTE', 'CLIENTE') || '')
+            }));
+
+        localStorage.setItem(QLP_CACHE_KEY, JSON.stringify({
+            data: processed,
+            timestamp: Date.now()
+        }));
+
+        return processed;
+    } catch (error) {
+        console.error("Erro ao carregar QLP:", error);
+        return [];
+    }
+};
+const getVal = (row: any, ...keys: string[]) => {
+    const rowKeys = Object.keys(row);
+    for (const k of keys) {
+        const normalizedK = k.toUpperCase().replace(/\s+/g, '');
+        const found = rowKeys.find(rk => rk.toUpperCase().replace(/\s+/g, '') === normalizedK);
+        if (found) return row[found];
+    }
+    return '';
+};
+
+export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Promise<any[]> => {
+    try {
+        console.log("DEBUG Protagonismo: Iniciando fetch...");
+
+        // 1. Buscar Lista de Bases
+        const basesUrl = `${url}?tab=${encodeURIComponent('Lista de Bases')}`;
+        console.log("DEBUG Protagonismo: URL de Bases:", basesUrl);
+
+        const basesRes = await fetch(basesUrl);
+        if (!basesRes.ok) throw new Error(`Erro HTTP ao buscar Bases: ${basesRes.status}`);
+
+        const rawBases = await basesRes.json();
+        console.log("DEBUG Protagonismo: Resposta Lista de Bases:", rawBases);
+
+        if (!Array.isArray(rawBases)) {
+            const errorMsg = typeof rawBases === 'object' && rawBases.error ? rawBases.error : JSON.stringify(rawBases);
+            throw new Error(`Aba 'Lista de Bases' não retornou uma lista. Resposta: ${errorMsg}`);
+        }
+
+        const baseList = rawBases.map(row => ({
+            base: String(getVal(row, 'BASES', 'BASE') || ''),
+            coord: String(getVal(row, 'Supervisor | Coordenador', 'SUP / COORD', 'SUP/COORD', 'COORDENADOR', 'COORD', 'SUPERVISOR') || ''),
+            lider: String(getVal(row, 'LÍDER ATUAL', 'LIDER ATUAL', 'LÍDER', 'LIDER', 'LEADER') || ''),
+            localidade: String(getVal(row, 'LOCALIDADE', 'LOCAL', 'CIDADE', 'HUB') || ''),
+            _raw_debug: row // Para debug visual na interface
+        })).filter(b => b.base && b.base !== 'undefined');
+
+        // 2. Buscar Notas
+        const notesUrl = `${url}?tab=${encodeURIComponent('Respostas ao formulário 1')}`;
+        console.log("DEBUG Protagonismo: URL de Notas:", notesUrl);
+
+        const notesRes = await fetch(notesUrl);
+        if (!notesRes.ok) throw new Error(`Erro HTTP ao buscar Notas: ${notesRes.status}`);
+
+        const rawNotes = await notesRes.json();
+        console.log("DEBUG Protagonismo: Resposta Respostas ao formulário 1:", rawNotes);
+
+        if (!Array.isArray(rawNotes)) {
+            console.warn("DEBUG Protagonismo: rawNotes não é um array!", rawNotes);
+        }
+
+        // 3. Agrupar notas por base (média)
+        const notesMap = new Map<string, { sum: number, count: number }>();
+        if (Array.isArray(rawNotes)) {
+            rawNotes.forEach(row => {
+                const base = String(getVal(row, 'BASE', 'BASES') || '').toUpperCase().trim();
+                const rawNota = getVal(row, 'NOTA_PROTAGONISMO', 'NOTA PROTAGONISMO', 'NOTA', 'PONTUAÇÃO', 'PONTOS');
+                const nota = Number(rawNota);
+
+                if (base && !isNaN(nota)) {
+                    if (!notesMap.has(base)) notesMap.set(base, { sum: 0, count: 0 });
+                    const current = notesMap.get(base)!;
+                    current.sum += nota;
+                    current.count += 1;
+                }
+            });
+        }
+
+        // 4. Combinar Bases com Médias
+        return baseList.map(b => {
+            const stats = notesMap.get(b.base.toUpperCase().trim());
+            const avg = stats ? stats.sum / stats.count : 0;
+            return {
+                ...b,
+                resultado: avg
+            };
+        });
+
+    } catch (error: any) {
+        console.error("Erro ao carregar Protagonismo:", error);
+        throw error; // Repassar para o componente tratar
     }
 };

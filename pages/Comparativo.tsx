@@ -193,8 +193,26 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
   const totals = useMemo(() => {
     if (baseMetrics.length === 0) return null;
 
-    const totalCarrMed = Math.round(baseMetrics.reduce((acc, b) => acc + b.carrMed, 0) / baseMetrics.length);
-    const totalCarrMax = Math.max(...baseMetrics.map(b => b.carrMax));
+    // Agregar dados diários globais para calcular Média e Máximo reais do Total Geral
+    const dailyGlobalMap = new Map<string, Set<string>>();
+    currentPeriodData.forEach(row => {
+      const dayKey = row.date;
+      const daySet = dailyGlobalMap.get(dayKey) || new Set<string>();
+      if (row.atCode && row.atCode !== '') {
+        daySet.add(`${row.hub}-${row.atCode}`);
+      } else {
+        daySet.add(`${row.hub}-row-${row.id}-${Math.random()}`);
+      }
+      dailyGlobalMap.set(dayKey, daySet);
+    });
+
+    const dailyCounts = Array.from(dailyGlobalMap.values()).map(set => set.size);
+    const totalATs = dailyCounts.reduce((a, b) => a + b, 0);
+    const numDays = dailyCounts.length;
+
+    const totalCarrMed = numDays > 0 ? Math.round(totalATs / numDays) : 0;
+    const totalCarrMax = dailyCounts.length > 0 ? Math.max(...dailyCounts) : 0;
+
     const avgPrevRate = baseMetrics.reduce((acc, b) => acc + b.prevRate, 0) / baseMetrics.length;
     const avgCurrRate = baseMetrics.reduce((acc, b) => acc + b.currRate, 0) / baseMetrics.length;
 
@@ -204,7 +222,7 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
       prevRate: Math.round(avgPrevRate * 100) / 100,
       currRate: Math.round(avgCurrRate * 100) / 100
     };
-  }, [baseMetrics]);
+  }, [baseMetrics, currentPeriodData]);
 
   // Formatar labels dos períodos
   const periodLabels = useMemo(() => {

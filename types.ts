@@ -70,3 +70,34 @@ export interface DeliveryData {
   successRate: number;
   status: 'META ALCANÇADA' | 'PRÓX DA META' | 'ABAIXO DA META';
 }
+
+export interface RawQLPRow {
+  [key: string]: any;
+}
+
+export interface QLPData {
+  base: string;
+  placa: string;
+  nome: string;
+  situacaoCnh: string;
+  situacaoMotorista: string;
+  tipoVeiculo: string;
+  situacaoGrPlaca: string;
+  cliente: string;
+}
+
+export interface BaseListItem {
+  base: string;
+  coord: string;
+  lider: string;
+  localidade: string;
+}
+
+export interface ProtagonismoNote {
+  base: string;
+  nota: number;
+}
+
+export interface ProtagonismoRow extends BaseListItem {
+  resultado: number;
+}
