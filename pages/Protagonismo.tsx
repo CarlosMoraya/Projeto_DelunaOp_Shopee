@@ -218,23 +218,6 @@ const Protagonismo: React.FC = () => {
           />
         </div>
       </section>
-
-      {/* Debug Section Temporária */}
-      {allData.length > 0 && (
-        <details className="p-4 bg-slate-100 rounded-lg text-xs font-mono text-slate-600 mb-10">
-          <summary className="cursor-pointer font-bold uppercase tracking-widest text-slate-400 mb-2">Debug Info (Clique para expandir)</summary>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h4 className="font-bold mb-2">Dados Processados (Item 1):</h4>
-              <pre className="whitespace-pre-wrap">{JSON.stringify(allData[0], null, 2)}</pre>
-            </div>
-            <div>
-              <h4 className="font-bold mb-2">Chaves Recebidas do Google Sheets:</h4>
-              <pre className="whitespace-pre-wrap">{JSON.stringify((allData[0] as any)._raw_debug, null, 2)}</pre>
-            </div>
-          </div>
-        </details>
-      )}
     </div>
   );
 };
