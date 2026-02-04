@@ -191,14 +191,17 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
         })).filter(b => b.base && b.base !== 'undefined');
 
         // 2. Buscar Notas
-        const notesUrl = `${url}?tab=${encodeURIComponent('Respostas ao formulário 1')}`;
+        const notesUrl = `${url}?tab=${encodeURIComponent('Respostas')}`;
         console.log("DEBUG Protagonismo: URL de Notas:", notesUrl);
 
         const notesRes = await fetch(notesUrl);
         if (!notesRes.ok) throw new Error(`Erro HTTP ao buscar Notas: ${notesRes.status}`);
 
         const rawNotes = await notesRes.json();
-        console.log("DEBUG Protagonismo: Resposta Respostas ao formulário 1:", rawNotes);
+        console.log("DEBUG Protagonismo: Resposta Respostas:", rawNotes);
+        if (rawNotes.length > 0) {
+            console.log("DEBUG Protagonismo: Colunas da aba Respostas:", Object.keys(rawNotes[0]));
+        }
 
         if (!Array.isArray(rawNotes)) {
             console.warn("DEBUG Protagonismo: rawNotes não é um array!", rawNotes);
