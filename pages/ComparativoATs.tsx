@@ -402,7 +402,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold text-deluna-primary">{row.qlp || '-'}</td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold">{row.carrMed || '-'}</td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold">{row.carrMax || '-'}</td>
-                          <td className="px-6 py-4 text-center border-r border-slate-100 font-black text-amber-600 bg-amber-50">
+                          <td className="px-6 py-4 text-center border-r border-slate-100 font-black text-green-800 bg-green-50">
                             {row.meta1 !== null ? formatNum(row.meta1) : '-'}
                           </td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-black text-slate-400">
@@ -437,7 +437,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.totalQLP || '-'}</td>
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.carrMed || '-'}</td>
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.carrMax || '-'}</td>
-                        <td className="px-6 py-5 text-center border-r border-slate-100 text-amber-600 bg-amber-50">
+                        <td className="px-6 py-5 text-center border-r border-slate-100 text-green-800 bg-green-50">
                           {totals.totalMeta1 !== null ? formatNum(totals.totalMeta1) : '-'}
                         </td>
                         <td className="px-6 py-5 text-center border-r border-slate-100 text-slate-400">{formatNum(totals.prev)}</td>
