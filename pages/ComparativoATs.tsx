@@ -378,6 +378,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                   <th className="px-6 py-5 border-r border-white/10 text-center">QLP</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">Carr. Méd</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">Carr. Máx</th>
+                  <th className="px-6 py-5 border-r border-white/10 text-center">DIF META 1</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center bg-amber-500/20 text-amber-100">META 1</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">Ant. (ATs)</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">Atual (ATs)</th>
@@ -388,7 +389,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
               <tbody className="text-[12px] font-medium text-slate-700">
                 {baseMetrics.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="p-8 text-center text-slate-400 font-bold">Nenhum dado encontrado para o período selecionado</td>
+                    <td colSpan={12} className="p-8 text-center text-slate-400 font-bold">Nenhum dado encontrado para o período selecionado</td>
                   </tr>
                 ) : (
                   <>
@@ -402,6 +403,9 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold text-deluna-primary">{row.qlp || '-'}</td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold">{row.carrMed || '-'}</td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold">{row.carrMax || '-'}</td>
+                          <td className={`px-6 py-4 text-center border-r border-slate-100 font-black ${row.meta1 !== null ? (row.currTotal - row.meta1 >= 0 ? 'text-green-700 bg-green-50/30' : 'text-red-600 bg-red-50/30') : ''}`}>
+                            {row.meta1 !== null ? formatNum(row.currTotal - row.meta1) : '-'}
+                          </td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-black text-green-800 bg-green-50">
                             {row.meta1 !== null ? formatNum(row.meta1) : '-'}
                           </td>
@@ -437,6 +441,9 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.totalQLP || '-'}</td>
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.carrMed || '-'}</td>
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.carrMax || '-'}</td>
+                        <td className={`px-6 py-5 text-center border-r border-slate-100 font-black ${totals.totalMeta1 !== null ? (totals.curr - totals.totalMeta1 >= 0 ? 'text-green-700 bg-green-50/30' : 'text-red-600 bg-red-50/30') : ''}`}>
+                          {totals.totalMeta1 !== null ? formatNum(totals.curr - totals.totalMeta1) : '-'}
+                        </td>
                         <td className="px-6 py-5 text-center border-r border-slate-100 text-green-800 bg-green-50">
                           {totals.totalMeta1 !== null ? formatNum(totals.totalMeta1) : '-'}
                         </td>
