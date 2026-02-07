@@ -75,7 +75,7 @@ const Header: React.FC<HeaderProps> = ({
         </button>
 
         <div className="flex items-center border-r border-slate-200 pr-4 mr-2">
-          <div className="h-12 min-w-[160px] px-3 flex items-center justify-center overflow-hidden">
+          <div className="h-16 min-w-[180px] px-3 flex items-center justify-center overflow-hidden">
 
             {/* Lógica: Se tiver URL e não tiver dado erro, tenta mostrar imagem. Senão, mostra Fallback. */}
             {finalLogoUrl && !imgError ? (
