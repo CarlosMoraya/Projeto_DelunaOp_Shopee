@@ -70,33 +70,55 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
     loadData();
   }, []);
 
-  const filteredTableData = useMemo(() => {
-    return tableData.filter(row => {
+  // Função auxiliar de filtro por período
+  const getFilteredDataByPeriod = (data: DeliveryData[], startStr: string, endStr: string) => {
+    const start = new Date(startStr).getTime();
+    const end = new Date(endStr).getTime();
+    return data.filter(row => {
+      const rowDate = new Date(row.date).getTime();
       const matchCoord = !selectedCoordinator || row.coordinator === selectedCoordinator;
       const matchHub = !selectedHub || row.hub === selectedHub;
       const matchDriver = !driverSearch || row.driver.toLowerCase().includes(driverSearch.toLowerCase());
-
-      // Filtro de Range de Data
-      const rowDate = new Date(row.date).getTime();
-      const start = new Date(startDate).getTime();
-      const end = new Date(endDate).getTime();
-
-      const matchDate = (!startDate || rowDate >= start) && (!endDate || rowDate <= end);
-
+      const matchDate = (!startStr || rowDate >= start) && (!endStr || rowDate <= end);
       return matchCoord && matchHub && matchDate && matchDriver;
     });
+  };
+
+  const filteredTableData = useMemo(() => {
+    return getFilteredDataByPeriod(tableData, startDate, endDate);
   }, [tableData, selectedCoordinator, selectedHub, driverSearch, startDate, endDate]);
+
+  // Calcular período anterior (mesmo intervalo no mês anterior)
+  const previousPeriodRange = useMemo(() => {
+    if (!startDate || !endDate) return null;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    const prevStart = new Date(start);
+    prevStart.setMonth(prevStart.getMonth() - 1);
+
+    const prevEnd = new Date(end);
+    prevEnd.setMonth(prevEnd.getMonth() - 1);
+
+    return {
+      start: prevStart.toISOString().split('T')[0],
+      end: prevEnd.toISOString().split('T')[0]
+    };
+  }, [startDate, endDate]);
+
+  const previousPeriodData = useMemo(() => {
+    if (!previousPeriodRange) return [];
+    return getFilteredDataByPeriod(tableData, previousPeriodRange.start, previousPeriodRange.end);
+  }, [tableData, previousPeriodRange, selectedCoordinator, selectedHub, driverSearch]);
 
   // Dados páginados e ordenados
   const paginatedData = useMemo(() => {
     // 1. Ordena por Data (Mais recente primeiro)
     const sorted = [...filteredTableData].sort((a, b) => {
-      // Tenta converter para data, se falhar, usa string compare
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
-
       if (!isNaN(dateA) && !isNaN(dateB)) {
-        return dateB - dateA; // Decrescente
+        return dateB - dateA;
       }
       return 0;
     });
@@ -118,19 +140,65 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
     }
   };
 
-  const totals = useMemo(() => {
-    const totalShipments = filteredTableData.reduce((acc, row) => acc + row.atQuantity, 0);
-    const totalDelivered = filteredTableData.reduce((acc, row) => acc + row.delivered, 0);
-    const totalFailures = filteredTableData.reduce((acc, row) => acc + row.failures, 0);
+  const calcMetrics = (data: DeliveryData[]) => {
+    const totalShipments = data.reduce((acc, row) => acc + row.atQuantity, 0);
+    const totalDelivered = data.reduce((acc, row) => acc + row.delivered, 0);
+    const totalFailures = data.reduce((acc, row) => acc + row.failures, 0);
     const successRate = totalShipments > 0 ? (totalDelivered / totalShipments) * 100 : 0;
 
-    return {
-      successRate: successRate.toFixed(1) + '%',
-      shipments: totalShipments.toLocaleString('pt-BR'),
-      failures: totalFailures.toLocaleString('pt-BR'),
-      delivered: totalDelivered.toLocaleString('pt-BR')
+    // Contagem de ATs únicas (por dia e hub)
+    const atMap = new Map<string, Set<string>>();
+    data.forEach(row => {
+      const key = `${row.date}-${row.hub}`;
+      if (!atMap.has(key)) atMap.set(key, new Set());
+      const code = row.atCode || `row-${row.id}`;
+      atMap.get(key)!.add(code);
+    });
+
+    let totalATs = 0;
+    atMap.forEach(set => totalATs += set.size);
+
+    return { totalShipments, totalDelivered, totalFailures, successRate, totalATs };
+  };
+
+  const totals = useMemo(() => {
+    const curr = calcMetrics(filteredTableData);
+    const prev = calcMetrics(previousPeriodData);
+
+    const calcChange = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
     };
-  }, [filteredTableData]);
+
+    const formatChange = (val: number) => {
+      const sign = val >= 0 ? '+' : '';
+      return `${sign}${val.toFixed(1).replace('.', ',')}%`;
+    };
+
+    return {
+      successRate: curr.successRate.toFixed(1) + '%',
+      successRateChange: formatChange(curr.successRate - prev.successRate), // Diferença de pontos percentuais
+      successRateNegative: (curr.successRate - prev.successRate) < 0,
+
+      shipments: curr.totalShipments.toLocaleString('pt-BR'),
+      shipmentsChange: formatChange(calcChange(curr.totalShipments, prev.totalShipments)),
+      shipmentsNegative: curr.totalShipments < prev.totalShipments,
+
+      failures: curr.totalFailures.toLocaleString('pt-BR'),
+      failuresChange: formatChange(calcChange(curr.totalFailures, prev.totalFailures)),
+      failuresNegative: curr.totalFailures > prev.totalFailures, // Mais falhas é negativo
+
+      delivered: curr.totalDelivered.toLocaleString('pt-BR'),
+      deliveredChange: formatChange(calcChange(curr.totalDelivered, prev.totalDelivered)),
+      deliveredNegative: curr.totalDelivered < prev.totalDelivered,
+
+      totalATs: curr.totalATs.toLocaleString('pt-BR'),
+      totalATsChange: formatChange(calcChange(curr.totalATs, prev.totalATs)),
+      totalATsNegative: curr.totalATs < prev.totalATs,
+
+      periodLabel: 'vs mês ant.'
+    };
+  }, [filteredTableData, previousPeriodData]);
 
   // Histograma dinâmico baseado no filtro
   const dynamicHistoryData = useMemo(() => {
@@ -226,11 +294,12 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
   return (
     <div className="p-4 md:p-10 flex flex-col gap-6 md:gap-10">
       {/* Cards de Métricas */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <MetricCard label="Taxa de Sucesso" value={totals.successRate} change="+1.2%" subText="vs semana ant." icon="check_circle" bgClass="bg-[#D8F3DC]" colorClass="text-deluna-primary" />
-        <MetricCard label="Total de Envios" value={totals.shipments} change="+3.8%" subText="volume global" icon="local_shipping" bgClass="bg-[#E2E8F0]" colorClass="text-deluna-primary" />
-        <MetricCard label="Insucessos" value={totals.failures} change="-0.5%" subText="melhoria contínua" icon="error" bgClass="bg-[#FEE2E2]" colorClass="text-[#BC4749]" negative />
-        <MetricCard label="Total Entregue" value={totals.delivered} change="+1.5%" subText="entregas concluídas" icon="inventory" bgClass="bg-deluna-teal/10" colorClass="text-deluna-teal" />
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
+        <MetricCard label="Taxa de Sucesso" value={totals.successRate} change={totals.successRateChange} subText={totals.periodLabel} icon="check_circle" bgClass="bg-[#D8F3DC]" colorClass="text-deluna-primary" negative={totals.successRateNegative} />
+        <MetricCard label="Total de ATS" value={totals.totalATs} change={totals.totalATsChange} subText={totals.periodLabel} icon="route" bgClass="bg-[#E0F2FE]" colorClass="text-[#0369A1]" negative={totals.totalATsNegative} />
+        <MetricCard label="Total de Envios" value={totals.shipments} change={totals.shipmentsChange} subText={totals.periodLabel} icon="local_shipping" bgClass="bg-[#E2E8F0]" colorClass="text-deluna-primary" negative={totals.shipmentsNegative} />
+        <MetricCard label="Insucessos" value={totals.failures} change={totals.failuresChange} subText={totals.periodLabel} icon="error" bgClass="bg-[#FEE2E2]" colorClass="text-[#BC4749]" negative={totals.failuresNegative} />
+        <MetricCard label="Total Entregue" value={totals.delivered} change={totals.deliveredChange} subText={totals.periodLabel} icon="inventory" bgClass="bg-deluna-teal/10" colorClass="text-deluna-teal" negative={totals.deliveredNegative} />
       </section>
 
       {/* Seção de Gráficos Superiores */}
