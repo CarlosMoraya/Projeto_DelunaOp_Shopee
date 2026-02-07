@@ -16,7 +16,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onCl
     { id: AppView.COMPARATIVO_ATS, icon: 'bar_chart', label: 'Comparativo ATs' },
     { id: AppView.QLP_MANAGEMENT, icon: 'analytics', label: 'QLP Atual' },
     { id: AppView.PROTAGONISMO, icon: 'military_tech', label: 'Protagonismo' },
-    { id: AppView.LEADERBOARD, icon: 'format_list_numbered', label: 'Campanha Acelera 30+' },
+    { id: AppView.LEADERBOARD, icon: 'format_list_numbered', label: 'Campanha Acelera +30' },
   ];
 
   return (
@@ -32,7 +32,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onCl
               <span className="material-symbols-outlined text-white">local_shipping</span>
             </div>
             <div className="flex flex-col">
-              <h1 className="text-white text-sm font-black leading-tight uppercase tracking-tighter">Deluna Ops</h1>
+              <h1 className="text-white text-sm font-black leading-tight uppercase tracking-tighter">Operação Shopee</h1>
               <p className="text-[#95D5B2] text-[8px] font-semibold tracking-widest uppercase">Excellence Dashboard</p>
             </div>
           </div>
@@ -46,11 +46,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onCl
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded text-sm transition-all text-left ${
-                currentView === item.id
-                  ? 'bg-white/10 text-white border-l-4 border-deluna-accent'
-                  : 'text-[#95D5B2] hover:bg-white/5 hover:text-white'
-              }`}
+              className={`flex items-center gap-3 px-4 py-3 rounded text-sm transition-all text-left ${currentView === item.id
+                ? 'bg-white/10 text-white border-l-4 border-deluna-accent'
+                : 'text-[#95D5B2] hover:bg-white/5 hover:text-white'
+                }`}
             >
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
               <span className={currentView === item.id ? 'font-semibold' : 'font-medium'}>
@@ -63,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onCl
 
       <div className="px-4">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-          <div 
+          <div
             className="w-10 h-10 rounded-full bg-cover bg-center border-2 border-deluna-accent"
             style={{ backgroundImage: `url('https://picsum.photos/seed/admin/100/100')` }}
           ></div>

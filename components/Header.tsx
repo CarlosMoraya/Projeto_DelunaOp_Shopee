@@ -14,7 +14,7 @@ interface HeaderProps {
 // ----------------------------------------------------------------------
 // COLOQUE O LINK DO SEU GOOGLE DRIVE AQUI DENTRO DAS ASPAS:
 // Exemplo: "https://drive.google.com/file/d/123456789/view?usp=sharing"
-const LOGO_URL = "";
+const LOGO_URL = "https://drive.google.com/file/d/1VrxeUSRRimoxb8PF6_OqneEwoYwXlpf-/view?usp=drive_link";
 // ----------------------------------------------------------------------
 
 const Header: React.FC<HeaderProps> = ({
@@ -30,14 +30,28 @@ const Header: React.FC<HeaderProps> = ({
   // Função para converter links de visualização do Drive em links diretos de imagem
   const getOptimizedImageUrl = (url: string) => {
     if (!url) return '';
-    if (url.includes('drive.google.com') && url.includes('/file/d/')) {
-      const id = url.split('/file/d/')[1].split('/')[0];
-      return `https://drive.google.com/uc?export=view&id=${id}`;
+
+    // Suporte para links do Google Drive
+    if (url.includes('drive.google.com')) {
+      let id = '';
+      if (url.includes('/file/d/')) {
+        // Formato: https://drive.google.com/file/d/ID/view...
+        id = url.split('/file/d/')[1].split('/')[0].split('?')[0];
+      } else if (url.includes('id=')) {
+        // Formato: https://drive.google.com/open?id=ID
+        id = url.split('id=')[1].split('&')[0];
+      }
+
+      if (id) {
+        // Usamos o endpoint de thumbnail com tamanho grande (sz=w1000) 
+        // pois é mais resiliente a bloqueios de "aviso de vírus" do Drive
+        return `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
+      }
     }
     return url;
   };
 
-  const finalLogoUrl = getOptimizedImageUrl(LOGO_URL);
+  const finalLogoUrl = React.useMemo(() => getOptimizedImageUrl(LOGO_URL), [LOGO_URL]);
 
   const getTitle = () => {
     switch (currentView) {
@@ -60,9 +74,8 @@ const Header: React.FC<HeaderProps> = ({
           <span className="material-symbols-outlined">menu</span>
         </button>
 
-        {/* Logo Container - Dark Brand Box */}
         <div className="flex items-center border-r border-slate-200 pr-4 mr-2">
-          <div className="bg-deluna-primary h-12 min-w-[120px] px-3 rounded-lg shadow-inner flex items-center justify-center overflow-hidden">
+          <div className="h-12 min-w-[160px] px-3 flex items-center justify-center overflow-hidden">
 
             {/* Lógica: Se tiver URL e não tiver dado erro, tenta mostrar imagem. Senão, mostra Fallback. */}
             {finalLogoUrl && !imgError ? (
@@ -73,12 +86,12 @@ const Header: React.FC<HeaderProps> = ({
                 onError={() => setImgError(true)}
               />
             ) : (
-              // Fallback Elegante (Logo CSS)
+              // Fallback Elegante (Logo CSS) - Ajustado para fundo claro
               <div className="flex items-center gap-2 animate-in fade-in duration-300">
-                <span className="material-symbols-outlined text-white text-[24px]">local_shipping</span>
+                <span className="material-symbols-outlined text-deluna-primary text-[24px]">local_shipping</span>
                 <div className="flex flex-col">
-                  <span className="text-white font-black text-sm leading-none tracking-tighter uppercase">Deluna</span>
-                  <span className="text-[#95D5B2] font-bold text-[8px] leading-none tracking-widest uppercase mt-0.5">Logistics</span>
+                  <span className="text-deluna-primary font-black text-sm leading-none tracking-tighter uppercase">Deluna</span>
+                  <span className="text-deluna-accent font-bold text-[8px] leading-none tracking-widest uppercase mt-0.5">Logistics</span>
                 </div>
               </div>
             )}

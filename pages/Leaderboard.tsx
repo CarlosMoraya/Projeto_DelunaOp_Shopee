@@ -40,7 +40,7 @@ const Leaderboard: React.FC = () => {
 
   const filteredLeaders = useMemo(() => {
     if (!searchTerm) return [];
-    return CAMPANHA_DATA.filter(item => 
+    return CAMPANHA_DATA.filter(item =>
       item.lider.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [searchTerm]);
@@ -51,19 +51,19 @@ const Leaderboard: React.FC = () => {
       .slice(0, 3);
   }, []);
 
-  const formatCurrency = (val: number) => 
+  const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   return (
     <div className="max-w-[1280px] mx-auto py-10 px-4 md:px-8 font-inter bg-[#F8FAFC] min-h-screen">
-      
+
       {/* Header da Campanha */}
       <div className="flex flex-col gap-4 mb-12">
         <div className="flex items-center gap-3">
           <span className="bg-deluna-primary text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest">Temporada Ativa</span>
           <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Incentivo Operacional • Base 5</p>
         </div>
-        <h1 className="text-deluna-primary text-4xl md:text-5xl font-black tracking-tighter uppercase">Campanha Acelera 30+</h1>
+        <h1 className="text-deluna-primary text-4xl md:text-5xl font-black tracking-tighter uppercase">Campanha Acelera +30</h1>
         <p className="text-slate-500 text-lg font-semibold italic">
           Acompanhe aqui, quanto você já está faturando com essa campanha!
         </p>
@@ -87,11 +87,11 @@ const Leaderboard: React.FC = () => {
         <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none">
           <span className="material-symbols-outlined text-[120px]">account_balance_wallet</span>
         </div>
-        
+
         <div className="max-w-2xl">
           <h3 className="text-deluna-primary text-2xl font-black uppercase mb-6">Consultar Meus Resultados</h3>
           <div className="relative group">
-            <input 
+            <input
               type="text"
               placeholder="Digite seu nome para consultar..."
               value={searchTerm}
@@ -107,17 +107,16 @@ const Leaderboard: React.FC = () => {
             {filteredLeaders.map((leader, idx) => (
               <div key={idx} className="flex flex-col gap-6">
                 {/* Mensagem Condicional */}
-                <div className={`p-6 rounded-2xl flex items-center gap-4 border-l-8 ${
-                  leader.regraAcesso 
-                    ? 'bg-green-50 border-green-500 text-green-800' 
-                    : 'bg-red-50 border-red-500 text-red-800'
-                }`}>
+                <div className={`p-6 rounded-2xl flex items-center gap-4 border-l-8 ${leader.regraAcesso
+                  ? 'bg-green-50 border-green-500 text-green-800'
+                  : 'bg-red-50 border-red-500 text-red-800'
+                  }`}>
                   <span className="material-symbols-outlined text-3xl">
                     {leader.regraAcesso ? 'celebration' : 'warning'}
                   </span>
                   <p className="text-lg font-black uppercase tracking-tight">
-                    {leader.regraAcesso 
-                      ? "Parabéns! Você está garantindo esse valor na sua conta virtual" 
+                    {leader.regraAcesso
+                      ? "Parabéns! Você está garantindo esse valor na sua conta virtual"
                       : "Olha quanto dinheiro você está perdendo! Corre! Ainda dá tempo"}
                   </p>
                 </div>
@@ -183,7 +182,7 @@ const Leaderboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="text-[12px] font-medium text-slate-700">
-              {CAMPANHA_DATA.sort((a,b) => b.total - a.total).map((row, i) => (
+              {CAMPANHA_DATA.sort((a, b) => b.total - a.total).map((row, i) => (
                 <tr key={`${row.base}-${i}`} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -195,11 +194,10 @@ const Leaderboard: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-black ${
-                      row.regraAcesso === 'META3' ? 'bg-green-100 text-green-700' :
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-black ${row.regraAcesso === 'META3' ? 'bg-green-100 text-green-700' :
                       row.regraAcesso === 'META2' ? 'bg-blue-100 text-blue-700' :
-                      row.regraAcesso === 'META1' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'
-                    }`}>
+                        row.regraAcesso === 'META1' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'
+                      }`}>
                       {row.regraAcesso || "SEM META"}
                     </span>
                   </td>
@@ -221,11 +219,11 @@ const Leaderboard: React.FC = () => {
 
 const PodiumCard: React.FC<{ rank: number; data: CampanhaRow; color: string; border: string; primary?: boolean }> = ({ rank, data, color, border, primary }) => (
   <div className={`bg-white rounded-[2rem] border-2 ${border} p-6 text-center shadow-xl transition-all hover:-translate-y-4 flex flex-col items-center group ${primary ? 'h-[420px] z-10 scale-105 md:scale-110' : 'h-[340px]'}`}>
-    
+
     <div className="relative mb-6">
       <div className={`rounded-full overflow-hidden border-4 ${primary ? 'size-32 border-deluna-gold' : 'size-24 border-slate-200'} shadow-2xl`}>
-        <div 
-          className="w-full h-full bg-cover bg-center transition-transform duration-700 group-hover:scale-110" 
+        <div
+          className="w-full h-full bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
           style={{ backgroundImage: `url('${data.avatar}')` }}
         ></div>
       </div>
@@ -237,7 +235,7 @@ const PodiumCard: React.FC<{ rank: number; data: CampanhaRow; color: string; bor
     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{data.base}</p>
     <h4 className={`text-deluna-primary font-black uppercase tracking-tight mb-4 ${primary ? 'text-xl' : 'text-base'}`}>{data.lider}</h4>
     <p className="text-[10px] font-bold text-slate-400 italic mb-4">{data.localidade}</p>
-    
+
     <div className={`flex flex-col gap-1 w-full p-4 rounded-2xl mt-auto ${primary ? 'bg-deluna-primary text-white' : 'bg-slate-50 text-deluna-primary'}`}>
       <p className={`text-[9px] font-black uppercase ${primary ? 'text-[#95D5B2]' : 'text-slate-400'}`}>Total Acumulado</p>
       <p className={`text-2xl font-black font-manrope`}>
