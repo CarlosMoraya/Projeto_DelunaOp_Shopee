@@ -12,6 +12,7 @@ const QLPManagement: React.FC = () => {
   const [filterCnh, setFilterCnh] = useState<string>('');
   const [filterMotorista, setFilterMotorista] = useState<string>('');
   const [filterGr, setFilterGr] = useState<string>('');
+  const [filterCoordenador, setFilterCoordenador] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const loadData = async (force = false) => {
@@ -41,14 +42,15 @@ const QLPManagement: React.FC = () => {
       const matchCnh = !filterCnh || row.situacaoCnh.toUpperCase() === filterCnh.toUpperCase();
       const matchMotorista = !filterMotorista || row.situacaoMotorista.toUpperCase() === filterMotorista.toUpperCase();
       const matchGr = !filterGr || row.situacaoGrPlaca.toUpperCase() === filterGr.toUpperCase();
+      const matchCoordenador = !filterCoordenador || row.coordenador.toUpperCase() === filterCoordenador.toUpperCase();
       const matchSearch = !searchTerm ||
         row.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.base.toLowerCase().includes(searchTerm.toLowerCase());
 
-      return matchCnh && matchMotorista && matchGr && matchSearch;
+      return matchCnh && matchMotorista && matchGr && matchCoordenador && matchSearch;
     });
-  }, [allData, filterCnh, filterMotorista, filterGr, searchTerm]);
+  }, [allData, filterCnh, filterMotorista, filterGr, filterCoordenador, searchTerm]);
 
   const stats = useMemo(() => {
     const total = filteredData.length;
@@ -81,6 +83,7 @@ const QLPManagement: React.FC = () => {
   const cnhOptions = useMemo(() => getOptions('situacaoCnh'), [allData]);
   const motoristaOptions = useMemo(() => getOptions('situacaoMotorista'), [allData]);
   const grOptions = useMemo(() => getOptions('situacaoGrPlaca'), [allData]);
+  const coordenadorOptions = useMemo(() => getOptions('coordenador'), [allData]);
 
   const getStatusColor = (status: string) => {
     const s = status.toUpperCase();
@@ -187,8 +190,26 @@ const QLPManagement: React.FC = () => {
           </select>
         </div>
 
+        <div className="flex flex-col gap-1 min-w-[150px]">
+          <label className="text-[10px] font-black uppercase text-slate-400">Coordenador</label>
+          <select
+            value={filterCoordenador}
+            onChange={(e) => setFilterCoordenador(e.target.value)}
+            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-deluna-primary/20 outline-none"
+          >
+            <option value="">TODOS</option>
+            {coordenadorOptions.map(opt => <option key={opt} value={opt}>{opt.toUpperCase()}</option>)}
+          </select>
+        </div>
+
         <button
-          onClick={() => { setFilterCnh(''); setFilterMotorista(''); setFilterGr(''); setSearchTerm(''); }}
+          onClick={() => {
+            setFilterCnh('');
+            setFilterMotorista('');
+            setFilterGr('');
+            setFilterCoordenador('');
+            setSearchTerm('');
+          }}
           className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold transition-all"
         >
           LIMPAR
@@ -215,6 +236,7 @@ const QLPManagement: React.FC = () => {
               <thead>
                 <tr className="bg-deluna-primary text-white text-[10px] font-black uppercase tracking-[0.15em]">
                   <th className="px-6 py-5 border-r border-white/10">BASE</th>
+                  <th className="px-6 py-5 border-r border-white/10">COORDENADOR</th>
                   <th className="px-6 py-5 border-r border-white/10">PLACA</th>
                   <th className="px-6 py-5 border-r border-white/10">NOME DO MOTORISTA</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">TIPO</th>
@@ -234,6 +256,7 @@ const QLPManagement: React.FC = () => {
                   filteredData.map((row, i) => (
                     <tr key={`${row.placa}-${i}`} className={`${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} border-b border-slate-100 hover:bg-deluna-primary/5 transition-colors`}>
                       <td className="px-6 py-4 font-black text-deluna-primary border-r border-slate-100 uppercase">{row.base}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-600 border-r border-slate-100 uppercase text-[10px]">{row.coordenador}</td>
                       <td className="px-6 py-4 font-mono font-bold text-slate-900 border-r border-slate-100">{row.placa}</td>
                       <td className="px-6 py-4 font-semibold border-r border-slate-100 uppercase">{row.nome}</td>
                       <td className="px-6 py-4 text-center border-r border-slate-100 italic font-bold text-slate-500">{row.tipoVeiculo}</td>

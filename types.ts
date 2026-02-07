@@ -84,6 +84,7 @@ export interface QLPData {
   tipoVeiculo: string;
   situacaoGrPlaca: string;
   cliente: string;
+  coordenador: string;
 }
 
 export interface BaseListItem {

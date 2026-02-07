@@ -55,9 +55,9 @@ const Header: React.FC<HeaderProps> = ({
 
   const getTitle = () => {
     switch (currentView) {
-      case AppView.DELIVERY_SUCCESS: return <>Sucesso de Entrega <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Operação Global</span></>;
-      case AppView.COMPARATIVO: return <>Cenários de Comparação DS <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Operação Global</span></>;
-      case AppView.COMPARATIVO_ATS: return <>Comparativo de Volume ATs <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Operação Global</span></>;
+      case AppView.DELIVERY_SUCCESS: return <>Sucesso de Entrega <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão Geral</span></>;
+      case AppView.COMPARATIVO: return <>Cenários de Comparação DS <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Período</span></>;
+      case AppView.COMPARATIVO_ATS: return <>Comparativo de Volume ATs <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Período</span></>;
       case AppView.QLP_MANAGEMENT: return <>Gestão de QLP <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Hub Operacional</span></>;
       case AppView.PROTAGONISMO: return <>Performance de Protagonismo <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Base 4</span></>;
       case AppView.LEADERBOARD: return <>Campanha Acelera 30+ <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Base 5</span></>;

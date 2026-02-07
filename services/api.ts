@@ -5,8 +5,29 @@ import { RawDeliveryRow, DeliveryData, RawQLPRow, QLPData } from '../types';
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
 
 const CACHE_KEY = 'delivery_data_cache_v5';
-const QLP_CACHE_KEY = 'qlp_data_cache_v1';
+const QLP_CACHE_KEY = 'qlp_data_cache_v2';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
+// --- HELPER FUNCTIONS ---
+const getVal = (row: any, ...keys: string[]) => {
+    const rowKeys = Object.keys(row);
+    const normalize = (s: string) => s.toUpperCase().replace(/[\s_|-]/g, '');
+
+    for (const k of keys) {
+        const normalizedK = normalize(k);
+        const found = rowKeys.find(rk => normalize(rk) === normalizedK);
+        if (found) return row[found];
+    }
+    return '';
+};
+
+const parseNum = (val: any): number => {
+    if (val === undefined || val === null || val === '') return NaN;
+    if (typeof val === 'number') return val;
+    const clean = String(val).replace(',', '.').trim();
+    return parseFloat(clean);
+};
+// ------------------------
 
 export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promise<DeliveryData[]> => {
     try {
@@ -91,6 +112,34 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
     }
 };
 
+const fetchBaseMetadata = async (url: string = GOOGLE_SCRIPT_URL): Promise<{ metadataMap: Map<string, { coord: string; lider: string; localidade: string }>; normalizeBase: (s: string) => string }> => {
+    try {
+        const response = await fetch(`${url}?tab=${encodeURIComponent('Lista de Bases')}`);
+        if (!response.ok) return { metadataMap: new Map(), normalizeBase: (s: string) => s };
+        const rawBases = await response.json();
+        if (!Array.isArray(rawBases)) return { metadataMap: new Map(), normalizeBase: (s: string) => s };
+
+        const metadataMap = new Map();
+        const normalizeBase = (s: string) => String(s || '').toUpperCase().replace(/[\s_|-]/g, '').replace(/^LAJ/, 'LRJ');
+
+        rawBases.forEach(row => {
+            const rawBase = String(getVal(row, 'BASES', 'BASE') || '');
+            const normalizedBase = normalizeBase(rawBase);
+            if (normalizedBase) {
+                metadataMap.set(normalizedBase, {
+                    coord: String(getVal(row, 'Supervisor | Coordenador', 'SUP / COORD', 'SUP/COORD', 'COORDENADOR', 'COORD', 'SUPERVISOR') || ''),
+                    lider: String(getVal(row, 'LÍDER ATUAL', 'LIDER ATUAL', 'LÍDER', 'LIDER', 'LEADER') || ''),
+                    localidade: String(getVal(row, 'LOCALIDADE', 'LOCAL', 'CIDADE', 'HUB') || '')
+                });
+            }
+        });
+        return { metadataMap, normalizeBase };
+    } catch (error) {
+        console.error("Erro ao buscar metadados de bases:", error);
+        return { metadataMap: new Map(), normalizeBase: (s: string) => s };
+    }
+};
+
 export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLPData[]> => {
     try {
         const cached = localStorage.getItem(QLP_CACHE_KEY);
@@ -101,25 +150,14 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
             }
         }
 
+        // 1. Buscar Metadados das Bases para pegar Coordenador
+        const { metadataMap, normalizeBase } = await fetchBaseMetadata(url);
+
         const response = await fetch(`${url}?tab=QLP`);
         if (!response.ok) throw new Error(`Erro na API QLP: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
         console.log("DEBUG QLP: Recebido", rawData.length, "linhas");
-        if (rawData.length > 0) {
-            console.log("DEBUG QLP: Colunas detectadas:", Object.keys(rawData[0]));
-        }
-
-        // Função auxiliar para pegar valor de chave ignorando case e espaços
-        const getVal = (row: any, ...keys: string[]) => {
-            const rowKeys = Object.keys(row);
-            for (const k of keys) {
-                const normalizedK = k.toUpperCase().replace(/\s+/g, '');
-                const found = rowKeys.find(rk => rk.toUpperCase().replace(/\s+/g, '') === normalizedK);
-                if (found) return row[found];
-            }
-            return '';
-        };
 
         const processed = rawData
             .filter(row => {
@@ -131,16 +169,23 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
 
                 return isShopee && isNotBonsucesso;
             })
-            .map(row => ({
-                base: String(getVal(row, 'BASE') || ''),
-                placa: String(getVal(row, 'PLACA') || ''),
-                nome: String(getVal(row, 'NOME') || ''),
-                situacaoCnh: String(getVal(row, 'SITUAÇÃO CNH', 'CNH') || ''),
-                situacaoMotorista: String(getVal(row, 'SITUAÇÃO MOTORISTA', 'MOTORISTA') || ''),
-                tipoVeiculo: String(getVal(row, 'TIPO DO VEÍCULO', 'TIPO VEICULO') || ''),
-                situacaoGrPlaca: String(getVal(row, 'SITUAÇÃO GR PLACA', 'GR PLACA') || ''),
-                cliente: String(getVal(row, 'Q CLENTE', 'CLIENTE') || '')
-            }));
+            .map(row => {
+                const baseName = String(getVal(row, 'BASE') || '');
+                const normalizedBaseName = normalizeBase(baseName);
+                const metadata = metadataMap.get(normalizedBaseName);
+
+                return {
+                    base: baseName,
+                    placa: String(getVal(row, 'PLACA') || ''),
+                    nome: String(getVal(row, 'NOME') || ''),
+                    situacaoCnh: String(getVal(row, 'SITUAÇÃO CNH', 'CNH') || ''),
+                    situacaoMotorista: String(getVal(row, 'SITUAÇÃO MOTORISTA', 'MOTORISTA') || ''),
+                    tipoVeiculo: String(getVal(row, 'TIPO DO VEÍCULO', 'TIPO VEICULO') || ''),
+                    situacaoGrPlaca: String(getVal(row, 'SITUAÇÃO GR PLACA', 'GR PLACA') || ''),
+                    cliente: String(getVal(row, 'Q CLENTE', 'CLIENTE') || ''),
+                    coordenador: metadata ? metadata.coord : ''
+                };
+            });
 
         localStorage.setItem(QLP_CACHE_KEY, JSON.stringify({
             data: processed,
@@ -152,25 +197,6 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
         console.error("Erro ao carregar QLP:", error);
         return [];
     }
-};
-const getVal = (row: any, ...keys: string[]) => {
-    const rowKeys = Object.keys(row);
-    const normalize = (s: string) => s.toUpperCase().replace(/[\s_|-]/g, '');
-
-    for (const k of keys) {
-        const normalizedK = normalize(k);
-        const found = rowKeys.find(rk => normalize(rk) === normalizedK);
-        if (found) return row[found];
-    }
-    return '';
-};
-
-// Helper for numeric conversion (handles commas)
-const parseNum = (val: any): number => {
-    if (val === undefined || val === null || val === '') return NaN;
-    if (typeof val === 'number') return val;
-    const clean = String(val).replace(',', '.').trim();
-    return parseFloat(clean);
 };
 
 export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Promise<any[]> => {
