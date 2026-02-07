@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { DeliveryData, QLPData } from '../types';
-import { fetchDeliveryData, fetchQLPData } from '../services/api';
+import { DeliveryData, QLPData, MetaGoalData } from '../types';
+import { fetchDeliveryData, fetchQLPData, fetchMetasData } from '../services/api';
 
 interface ComparativoATsProps {
   startDate: string;
@@ -14,6 +13,7 @@ interface BaseMetricsATs {
   leader: string;
   coordinator: string;
   qlp: number;
+  meta1: number | null; // Null se cruzar meses
   carrMed: number;
   carrMax: number;
   prevTotal: number;
@@ -24,6 +24,7 @@ interface BaseMetricsATs {
 const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) => {
   const [allData, setAllData] = useState<DeliveryData[]>([]);
   const [qlpData, setQlpData] = useState<QLPData[]>([]);
+  const [metasData, setMetasData] = useState<MetaGoalData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCoordinator, setSelectedCoordinator] = useState<string>('');
 
@@ -31,12 +32,14 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     const loadData = async () => {
       try {
         setLoading(true);
-        const [deliveryRes, qlpRes] = await Promise.all([
+        const [deliveryRes, qlpRes, metasRes] = await Promise.all([
           fetchDeliveryData(),
-          fetchQLPData()
+          fetchQLPData(),
+          fetchMetasData()
         ]);
         setAllData(deliveryRes);
         setQlpData(qlpRes);
+        setMetasData(metasRes);
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
       } finally {
@@ -45,6 +48,8 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     };
     loadData();
   }, []);
+
+
 
   // Calcular período anterior (mesmo intervalo no mês anterior)
   const getPreviousPeriod = useMemo(() => {
@@ -175,16 +180,8 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     });
 
     // Consolidar totais anteriores no mapa principal
-    // (Atenção: bases que só existiram no mês anterior e não no atual não aparecerão na tabela
-    // se iterarmos apenas sobre basesMap. Se quisermos mostrar todas, precisaríamos unir as chaves.
-    // O padrão geralmente é mostrar a base ativa. Vamos manter basesMap como guia).
     prevBasesMap.forEach((daysMap, base) => {
       if (!basesMap.has(base)) {
-        // Se a base teve volume apenas no mês anterior e queremos mostrá-la:
-        // Precisamos recuperar locality/leader/coordinator de algum registro anterior
-        // Simplificação: Vamos focar nas bases que têm operação atual ou vamos adicionar se não existir?
-        // "Comparativo" geralmente foca no presente vs passado. Se a base fechou, talvez deva aparecer zerada no atual.
-        // Para consistência com Comparativo.tsx, vamos adicionar se não existir.
         const sampleRow = previousPeriodData.find(r => r.hub === base);
         basesMap.set(base, {
           locality: sampleRow?.locality || '',
@@ -200,12 +197,58 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
       basesMap.get(base)!.prevTotal = total;
     });
 
+    // Função para calcular META 1 (dentro do useMemo para acessar startDate e endDate)
+    const calculateMeta1 = (baseName: string) => {
+      // Validar datas
+      if (!startDate || !endDate) return 0;
+
+      // Parse manual para evitar problemas de timezone (YYYY-MM-DD)
+      const [year1, month1, day1] = startDate.split('-').map(Number);
+      const [year2, month2, day2] = endDate.split('-').map(Number);
+
+      const start = new Date(year1, month1 - 1, day1);
+      const end = new Date(year2, month2 - 1, day2);
+
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+
+      // 1. Verificar se cruza meses
+      if (start.getMonth() !== end.getMonth() || start.getFullYear() !== end.getFullYear()) {
+        return null; // Retorna null para exibir traço
+      }
+
+      // 2. Definir nome do mês
+      const months = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      ];
+      const currentMonthName = months[start.getMonth()];
+
+      // 3. Calcular dias
+      // +1 para incluir o dia final no cálculo
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      // 4. Encontrar meta
+      const normalize = (s: string) => s.toUpperCase().replace(/[\s_|-]/g, '');
+      const normalizedBase = normalize(baseName);
+
+      // Usar comparação de string case-insensitive
+      const meta = metasData.find(m =>
+        normalize(m.base) === normalizedBase &&
+        m.periodo.toLowerCase() === currentMonthName.toLowerCase() &&
+        m.tipoMeta === 1
+      );
+
+      if (!meta) return 0;
+
+      return Math.round(meta.valorMetaDia * diffDays);
+    };
+
+
     // Construir resultado final
     const result: BaseMetricsATs[] = [];
 
     basesMap.forEach((data, base) => {
-      // Métricas de Carregamento (Baseado APENAS no Período Atual para Cap/Máx, ou deveria considerar histórico?)
-      // Carr Méd/Máx geralmente referem-se à operação atual.
       const dailyCounts: number[] = [];
       data.currDaysData.forEach(set => dailyCounts.push(set.size));
 
@@ -223,6 +266,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
         leader: data.leader,
         coordinator: data.coordinator,
         qlp: qlpCounts.get(normalizeBase(base)) || 0,
+        meta1: calculateMeta1(base),
         carrMed,
         carrMax,
         prevTotal: data.prevTotal,
@@ -232,13 +276,13 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     });
 
     return result.sort((a, b) => a.base.localeCompare(b.base));
-  }, [currentPeriodData, previousPeriodData, qlpCounts]);
+  }, [currentPeriodData, previousPeriodData, qlpCounts, metasData, startDate, endDate]);
 
   // Calcular totais gerais
   const totals = useMemo(() => {
     if (baseMetrics.length === 0) return null;
 
-    // Agregar dados diários globais para calcular Média e Máximo reais do Total Geral
+    // Agregar dados diários globais
     const dailyGlobalMap = new Map<string, Set<string>>();
     currentPeriodData.forEach(row => {
       const dayKey = row.date;
@@ -262,12 +306,24 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     const totalCurr = baseMetrics.reduce((sum, item) => sum + item.currTotal, 0);
     const totalQLP = baseMetrics.reduce((sum, item) => sum + item.qlp, 0);
 
+    // Soma das Metas (cuidado com nulls)
+    let totalMeta1 = 0;
+    let hasCrossMonth = false;
+    baseMetrics.forEach(item => {
+      if (item.meta1 === null) {
+        hasCrossMonth = true;
+      } else {
+        totalMeta1 += item.meta1;
+      }
+    });
+
     return {
       carrMed: totalCarrMed,
       carrMax: totalCarrMax,
       prev: totalPrev,
       curr: totalCurr,
-      totalQLP
+      totalQLP,
+      totalMeta1: hasCrossMonth ? null : totalMeta1
     };
   }, [baseMetrics, currentPeriodData]);
 
@@ -278,17 +334,6 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     if (prev === 0) return curr > 0 ? 100 : 0;
     return ((curr - prev) / prev) * 100;
   };
-
-  const periodLabels = useMemo(() => {
-    const formatDate = (dateStr: string) => {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-    };
-    return {
-      curr: `${formatDate(startDate)} a ${formatDate(endDate)}`,
-      prev: `${formatDate(getPreviousPeriod.start)} a ${formatDate(getPreviousPeriod.end)}`
-    };
-  }, [startDate, endDate, getPreviousPeriod]);
 
   return (
     <div className="p-4 md:p-10 font-inter bg-[#F8FAFC] min-h-screen flex flex-col gap-6 md:gap-10">
@@ -333,6 +378,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                   <th className="px-6 py-5 border-r border-white/10 text-center">QLP</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">Carr. Méd</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">Carr. Máx</th>
+                  <th className="px-6 py-5 border-r border-white/10 text-center bg-amber-500/20 text-amber-100">META 1</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">Ant. (ATs)</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">Atual (ATs)</th>
                   <th className="px-6 py-5 text-center bg-black min-w-[120px]">Var %</th>
@@ -342,7 +388,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
               <tbody className="text-[12px] font-medium text-slate-700">
                 {baseMetrics.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="p-8 text-center text-slate-400 font-bold">Nenhum dado encontrado para o período selecionado</td>
+                    <td colSpan={11} className="p-8 text-center text-slate-400 font-bold">Nenhum dado encontrado para o período selecionado</td>
                   </tr>
                 ) : (
                   <>
@@ -356,6 +402,9 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold text-deluna-primary">{row.qlp || '-'}</td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold">{row.carrMed || '-'}</td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold">{row.carrMax || '-'}</td>
+                          <td className="px-6 py-4 text-center border-r border-slate-100 font-black text-amber-600 bg-amber-50">
+                            {row.meta1 !== null ? formatNum(row.meta1) : '-'}
+                          </td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-black text-slate-400">
                             {formatNum(row.prevTotal)}
                           </td>
@@ -388,6 +437,9 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.totalQLP || '-'}</td>
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.carrMed || '-'}</td>
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.carrMax || '-'}</td>
+                        <td className="px-6 py-5 text-center border-r border-slate-100 text-amber-600 bg-amber-50">
+                          {totals.totalMeta1 !== null ? formatNum(totals.totalMeta1) : '-'}
+                        </td>
                         <td className="px-6 py-5 text-center border-r border-slate-100 text-slate-400">{formatNum(totals.prev)}</td>
                         <td className="px-6 py-5 text-center border-r border-slate-100 text-deluna-primary">{formatNum(totals.curr)}</td>
                         <td className="px-6 py-5 text-center bg-slate-100">

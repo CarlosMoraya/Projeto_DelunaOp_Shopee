@@ -1,15 +1,16 @@
 
-import { RawDeliveryRow, DeliveryData, RawQLPRow, QLPData } from '../types';
+import { DeliveryData, QLPData, MetaGoalData } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
 
 const CACHE_KEY = 'delivery_data_cache_v5';
 const QLP_CACHE_KEY = 'qlp_data_cache_v2';
+const METAS_CACHE_KEY = 'metas_data_cache_v2';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 // --- HELPER FUNCTIONS ---
-const getVal = (row: any, ...keys: string[]) => {
+export const getVal = (row: any, ...keys: string[]) => {
     const rowKeys = Object.keys(row);
     const normalize = (s: string) => s.toUpperCase().replace(/[\s_|-]/g, '');
 
@@ -21,7 +22,7 @@ const getVal = (row: any, ...keys: string[]) => {
     return '';
 };
 
-const parseNum = (val: any): number => {
+export const parseNum = (val: any): number => {
     if (val === undefined || val === null || val === '') return NaN;
     if (typeof val === 'number') return val;
     const clean = String(val).replace(',', '.').trim();
@@ -47,7 +48,7 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
             throw new Error(`Erro na API: ${response.statusText}`);
         }
 
-        const rawData: RawDeliveryRow[] = await response.json();
+        const rawData: any[] = await response.json();
 
         if (!Array.isArray(rawData)) {
             console.error("Formato de resposta inválido", rawData);
@@ -140,6 +141,39 @@ const fetchBaseMetadata = async (url: string = GOOGLE_SCRIPT_URL): Promise<{ met
     }
 };
 
+export const fetchMetasData = async (url: string = GOOGLE_SCRIPT_URL): Promise<MetaGoalData[]> => {
+    try {
+        const cached = localStorage.getItem(METAS_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                return data;
+            }
+        }
+
+        const response = await fetch(`${url}?tab=Metas`);
+        if (!response.ok) throw new Error(`Erro na API Metas: ${response.statusText}`);
+
+        const rawData: any[] = await response.json();
+        const processed = rawData.map(row => ({
+            base: String(getVal(row, 'BASES') || '').trim(),
+            periodo: String(getVal(row, 'PERÍODO', 'Periodo') || '').trim(),
+            tipoMeta: Number(getVal(row, 'TIPO_META', 'Tipo_Meta') || 0),
+            valorMetaDia: parseNum(getVal(row, 'VALOR_META_DIA', 'Valor_Meta_dia') || 0)
+        }));
+
+        localStorage.setItem(METAS_CACHE_KEY, JSON.stringify({
+            data: processed,
+            timestamp: Date.now()
+        }));
+
+        return processed;
+    } catch (error) {
+        console.error("Erro ao carregar Metas:", error);
+        return [];
+    }
+};
+
 export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLPData[]> => {
     try {
         const cached = localStorage.getItem(QLP_CACHE_KEY);
@@ -157,7 +191,6 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
         if (!response.ok) throw new Error(`Erro na API QLP: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
-        console.log("DEBUG QLP: Recebido", rawData.length, "linhas");
 
         const processed = rawData
             .filter(row => {
@@ -211,7 +244,6 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
         if (!basesRes.ok) throw new Error(`Erro HTTP ao buscar Bases: ${basesRes.status}`);
 
         const rawBases = await basesRes.json();
-        console.log("DEBUG Protagonismo: Resposta Lista de Bases:", rawBases);
 
         if (!Array.isArray(rawBases)) {
             const errorMsg = typeof rawBases === 'object' && rawBases.error ? rawBases.error : JSON.stringify(rawBases);
@@ -234,11 +266,6 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
         if (!notesRes.ok) throw new Error(`Erro HTTP ao buscar Notas: ${notesRes.status}`);
 
         const rawNotes = await notesRes.json();
-        console.log("DEBUG Protagonismo: Total de notas recebidas:", rawNotes.length);
-        if (rawNotes.length > 0) {
-            console.log("DEBUG Protagonismo: Colunas da aba Respostas:", Object.keys(rawNotes[0]));
-            console.log("DEBUG Protagonismo: Amostra da primeira nota:", rawNotes[0]);
-        }
 
         if (!Array.isArray(rawNotes)) {
             console.warn("DEBUG Protagonismo: rawNotes não é um array!", rawNotes);
@@ -255,8 +282,6 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
                 // Tenta pegar a nota
                 const rawNota = getVal(row, 'NOTA_PROTAGONISMO', 'NOTA PROTAGONISMO', 'NOTA', 'PONTUAÇÃO', 'PONTOS');
                 const nota = parseNum(rawNota);
-
-                if (idx === 0) console.log(`DEBUG Check: Base="${base}", Nota="${nota}" (original="${rawNota}")`);
 
                 if (base && !isNaN(nota)) {
                     if (!notesMap.has(base)) notesMap.set(base, { sum: 0, count: 0 });

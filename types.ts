@@ -87,6 +87,13 @@ export interface QLPData {
   coordenador: string;
 }
 
+export interface MetaGoalData {
+  base: string;
+  periodo: string; // Ex: "Janeiro"
+  tipoMeta: number;
+  valorMetaDia: number;
+}
+
 export interface BaseListItem {
   base: string;
   coord: string;
