@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { DeliveryData } from '../types';
-import { fetchDeliveryData } from '../services/api';
+import { DeliveryData, QLPData } from '../types';
+import { fetchDeliveryData, fetchQLPData } from '../services/api';
 
 interface ComparativoProps {
   startDate: string;
@@ -23,6 +23,7 @@ interface BaseMetrics {
 
 const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
   const [allData, setAllData] = useState<DeliveryData[]>([]);
+  const [qlpData, setQlpData] = useState<QLPData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCoordinator, setSelectedCoordinator] = useState<string>('');
 
@@ -30,8 +31,12 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const data = await fetchDeliveryData();
-        setAllData(data);
+        const [deliveryRes, qlpRes] = await Promise.all([
+          fetchDeliveryData(),
+          fetchQLPData()
+        ]);
+        setAllData(deliveryRes);
+        setQlpData(qlpRes);
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
       } finally {
@@ -90,6 +95,19 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
     }
     return data;
   }, [allData, getPreviousPeriod, selectedCoordinator]);
+
+  const qlpCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    const normalizeBase = (s: string) => String(s || '').toUpperCase().replace(/[\s_|-]/g, '').replace(/^LAJ/, 'LRJ');
+
+    qlpData.forEach(row => {
+      const normalizedBase = normalizeBase(row.base);
+      if (normalizedBase) {
+        counts.set(normalizedBase, (counts.get(normalizedBase) || 0) + 1);
+      }
+    });
+    return counts;
+  }, [qlpData]);
 
   // Agrupar dados por Base e calcular métricas
   const baseMetrics = useMemo(() => {
@@ -172,12 +190,14 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
       const currRate = data.currTotalAT > 0 ? (data.currTotalDelivered / data.currTotalAT) * 100 : 0;
       const prevRate = data.prevTotalAT > 0 ? (data.prevTotalDelivered / data.prevTotalAT) * 100 : 0;
 
+      const normalizeBase = (s: string) => String(s || '').toUpperCase().replace(/[\s_|-]/g, '').replace(/^LAJ/, 'LRJ');
+
       result.push({
         base,
         locality: data.locality,
         leader: data.leader,
         coordinator: data.coordinator,
-        qlp: 0, // Pendente de outra fonte
+        qlp: qlpCounts.get(normalizeBase(base)) || 0,
         carrMed,
         carrMax,
         prevRate: Math.round(prevRate * 100) / 100,
@@ -187,7 +207,7 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
     });
 
     return result.sort((a, b) => a.base.localeCompare(b.base));
-  }, [currentPeriodData, previousPeriodData]);
+  }, [currentPeriodData, previousPeriodData, qlpCounts]);
 
   // Calcular totais gerais
   const totals = useMemo(() => {
@@ -213,12 +233,15 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
     const totalCarrMed = numDays > 0 ? Math.round(totalATs / numDays) : 0;
     const totalCarrMax = dailyCounts.length > 0 ? Math.max(...dailyCounts) : 0;
 
+    const totalQLP = baseMetrics.reduce((acc, b) => acc + b.qlp, 0);
+
     const avgPrevRate = baseMetrics.reduce((acc, b) => acc + b.prevRate, 0) / baseMetrics.length;
     const avgCurrRate = baseMetrics.reduce((acc, b) => acc + b.currRate, 0) / baseMetrics.length;
 
     return {
       carrMed: totalCarrMed,
       carrMax: totalCarrMax,
+      totalQLP,
       prevRate: Math.round(avgPrevRate * 100) / 100,
       currRate: Math.round(avgCurrRate * 100) / 100
     };
@@ -299,7 +322,7 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
                           <td className="px-6 py-4 font-black text-deluna-primary border-r border-slate-100">{row.base}</td>
                           <td className="px-6 py-4 italic font-bold text-slate-500 border-r border-slate-100">{row.locality || '-'}</td>
                           <td className="px-6 py-4 font-semibold border-r border-slate-100">{row.leader || '-'}</td>
-                          <td className="px-6 py-4 text-center border-r border-slate-100 font-bold">-</td>
+                          <td className="px-6 py-4 text-center border-r border-slate-100 font-bold text-deluna-primary">{row.qlp || '-'}</td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold">{row.carrMed || '-'}</td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-bold">{row.carrMax || '-'}</td>
                           <td className={`px-6 py-4 text-center border-r border-slate-100 font-black ${row.prevRate > 0 && row.prevRate < 98 ? 'text-red-500' : ''}`}>
@@ -329,7 +352,7 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
                     {totals && (
                       <tr className="bg-white border-t-2 border-slate-900 font-black text-deluna-primary text-[10px] md:text-[12px]">
                         <td colSpan={3} className="px-6 py-5 italic text-right border-r border-slate-100 uppercase tracking-widest">Total Geral</td>
-                        <td className="px-6 py-5 text-center border-r border-slate-100">-</td>
+                        <td className="px-6 py-5 text-center border-r border-slate-100">{totals.totalQLP || '-'}</td>
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.carrMed || '-'}</td>
                         <td className="px-6 py-5 text-center border-r border-slate-100">{totals.carrMax || '-'}</td>
                         <td className={`px-6 py-5 text-center border-r border-slate-100 ${totals.prevRate < 98 ? 'text-red-500' : ''}`}>
