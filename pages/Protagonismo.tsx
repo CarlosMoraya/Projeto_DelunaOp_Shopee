@@ -115,7 +115,7 @@ const Protagonismo: React.FC = () => {
           <section className="flex flex-col gap-6">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-deluna-gold scale-125">military_tech</span>
-              <h2 className="text-xl font-black text-deluna-primary uppercase tracking-tight">Pódio de Elite (Meta 1+)</h2>
+              <h2 className="text-xl font-black text-deluna-primary uppercase tracking-tight">Pódio de Elite (Protagonista)</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
