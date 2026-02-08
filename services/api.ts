@@ -58,8 +58,9 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
         const processedData = rawData
             .filter(row => row.Motorista && row.Remessas !== "" && row.Remessas !== undefined)
             .map(row => {
-                const atQuantity = Number(row.Remessas) || 0;
-                const delivered = Number(row.Entregues) || 0;
+                const atQuantity = parseNum(getVal(row, 'Remessas', 'QTD_AT', 'QUANTIDADE')) || 0;
+                const delivered = parseNum(getVal(row, 'Entregues', 'ENTREGUE', 'DELIVERED')) || 0;
+                const pending = parseNum(getVal(row, 'Pendentes', 'PENDENTE', 'PENDING')) || 0;
 
                 let rate = 0;
                 if (atQuantity > 0) {
@@ -76,18 +77,37 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
                     status = 'ABAIXO DA META';
                 }
 
+                // Normalizar data (YYYY-MM-DD ou DD/MM/YYYY)
+                let rawDate = String(getVal(row, 'Date', 'DATA') || '');
+                let formattedDate = '';
+                if (rawDate.includes('T')) {
+                    formattedDate = rawDate.split('T')[0];
+                } else if (rawDate.includes('/')) {
+                    // Tenta converter DD/MM/YYYY para YYYY-MM-DD
+                    const parts = rawDate.split('/');
+                    if (parts.length === 3) {
+                        const [d, m, y] = parts;
+                        formattedDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                    } else {
+                        formattedDate = rawDate;
+                    }
+                } else {
+                    formattedDate = rawDate;
+                }
+
                 return {
-                    date: row.Date ? String(row.Date).split('T')[0] : '',
-                    id: String(row.ID || 'S/ID'),
-                    driver: row.Motorista,
-                    hub: String(row.Bases || 'S/H'),
-                    coordinator: String(row.Coordenador || 'S/C'),
-                    leader: String(row.Lider || ''),
-                    locality: String(row.Localidade || ''),
-                    atCode: String(row.AT || ''),
+                    date: formattedDate,
+                    id: String(getVal(row, 'ID') || 'S/ID'),
+                    driver: String(getVal(row, 'Motorista', 'DRIVER') || 'S/M'),
+                    hub: String(getVal(row, 'Bases', 'BASE', 'HUB') || 'S/H'),
+                    coordinator: String(getVal(row, 'Coordenador', 'COORD', 'SUPERVISOR') || 'S/C'),
+                    leader: String(getVal(row, 'Lider', 'LIDER', 'LEADER') || ''),
+                    locality: String(getVal(row, 'Localidade', 'LOCAL', 'CIDADE') || ''),
+                    atCode: String(getVal(row, 'AT', 'COD_AT') || ''),
                     atQuantity: atQuantity,
                     failures: Math.max(0, atQuantity - delivered),
                     delivered: delivered,
+                    pending: pending,
                     successRate: rate,
                     status: status
                 };

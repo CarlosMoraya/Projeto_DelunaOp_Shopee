@@ -18,6 +18,7 @@ interface BaseMetricsATs {
   carrMax: number;
   prevTotal: number;
   currTotal: number;
+  pending: number;
   trend: 'up' | 'down';
 }
 
@@ -122,6 +123,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
       currDaysData: Map<string, Set<string>>; // Map<Data, Set<AT_ID>>
       currTotal: number;
       prevTotal: number;
+      pending: number;
     }>();
 
     // Processar PERÍODO ATUAL
@@ -134,7 +136,8 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
           coordinator: row.coordinator || '',
           currDaysData: new Map(),
           currTotal: 0,
-          prevTotal: 0
+          prevTotal: 0,
+          pending: 0
         });
       }
       const entry = basesMap.get(base)!;
@@ -150,6 +153,9 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
         dayATs.add(`row-${row.id}-${Math.random()}`);
       }
       entry.currDaysData.set(dayKey, dayATs);
+
+      // Pendentes: somar TODAS as ocorrências (cada linha conta)
+      entry.pending += row.pending || 0;
     });
 
     // Calcular TOTAL ATUAL (soma dos tamanhos dos sets de cada dia)
@@ -189,7 +195,8 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
           coordinator: sampleRow?.coordinator || '',
           currDaysData: new Map(),
           currTotal: 0,
-          prevTotal: 0
+          prevTotal: 0,
+          pending: 0
         });
       }
       let total = 0;
@@ -271,6 +278,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
         carrMax,
         prevTotal: data.prevTotal,
         currTotal: data.currTotal,
+        pending: data.pending,
         trend: data.currTotal >= data.prevTotal ? 'up' : 'down'
       });
     });
@@ -304,6 +312,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
 
     const totalPrev = baseMetrics.reduce((sum, item) => sum + item.prevTotal, 0);
     const totalCurr = baseMetrics.reduce((sum, item) => sum + item.currTotal, 0);
+    const totalPending = baseMetrics.reduce((sum, item) => sum + item.pending, 0);
     const totalQLP = baseMetrics.reduce((sum, item) => sum + item.qlp, 0);
 
     // Soma das Metas (cuidado com nulls)
@@ -322,6 +331,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
       carrMax: totalCarrMax,
       prev: totalPrev,
       curr: totalCurr,
+      pending: totalPending,
       totalQLP,
       totalMeta1: hasCrossMonth ? null : totalMeta1
     };
@@ -382,6 +392,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                   <th className="px-6 py-5 border-r border-white/10 text-center bg-amber-500/20 text-amber-100">META 1</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">Ant. (ATs)</th>
                   <th className="px-6 py-5 border-r border-white/10 text-center">Atual (ATs)</th>
+                  <th className="px-6 py-5 border-r border-white/10 text-center">PENDENTES</th>
                   <th className="px-6 py-5 text-center bg-black min-w-[120px]">Var %</th>
                   <th className="px-6 py-5 text-center">Trend</th>
                 </tr>
@@ -389,7 +400,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
               <tbody className="text-[12px] font-medium text-slate-700">
                 {baseMetrics.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="p-8 text-center text-slate-400 font-bold">Nenhum dado encontrado para o período selecionado</td>
+                    <td colSpan={13} className="p-8 text-center text-slate-400 font-bold">Nenhum dado encontrado para o período selecionado</td>
                   </tr>
                 ) : (
                   <>
@@ -414,6 +425,9 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                           </td>
                           <td className="px-6 py-4 text-center border-r border-slate-100 font-black text-slate-800">
                             {formatNum(row.currTotal)}
+                          </td>
+                          <td className={`px-6 py-4 text-center border-r border-slate-100 font-black ${row.pending > 0 ? 'text-red-600 bg-red-50/10' : 'text-slate-400'}`}>
+                            {row.pending > 0 ? formatNum(row.pending) : '-'}
                           </td>
                           <td className="px-6 py-4 text-center bg-slate-50/80 font-black">
                             <div className="flex items-center justify-center gap-2">
@@ -449,6 +463,9 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
                         </td>
                         <td className="px-6 py-5 text-center border-r border-slate-100 text-slate-400">{formatNum(totals.prev)}</td>
                         <td className="px-6 py-5 text-center border-r border-slate-100 text-deluna-primary">{formatNum(totals.curr)}</td>
+                        <td className={`px-6 py-5 text-center border-r border-slate-100 ${totals.pending > 0 ? 'text-red-600 bg-red-50/10' : ''}`}>
+                          {totals.pending > 0 ? formatNum(totals.pending) : '-'}
+                        </td>
                         <td className="px-6 py-5 text-center bg-slate-100">
                           <div className="flex items-center justify-center gap-2">
                             {(() => {

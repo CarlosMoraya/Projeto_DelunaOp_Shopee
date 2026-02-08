@@ -67,6 +67,7 @@ export interface DeliveryData {
   atQuantity: number;
   failures: number;
   delivered: number;
+  pending: number;
   successRate: number;
   status: 'META ALCANÇADA' | 'PRÓX DA META' | 'ABAIXO DA META';
 }
