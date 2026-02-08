@@ -179,7 +179,8 @@ export const fetchMetasData = async (url: string = GOOGLE_SCRIPT_URL): Promise<M
             base: String(getVal(row, 'BASES') || '').trim(),
             periodo: String(getVal(row, 'PERÍODO', 'Periodo') || '').trim(),
             tipoMeta: Number(getVal(row, 'TIPO_META', 'Tipo_Meta') || 0),
-            valorMetaDia: parseNum(getVal(row, 'VALOR_META_DIA', 'Valor_Meta_dia') || 0)
+            valorMetaDia: parseNum(getVal(row, 'VALOR_META_DIA', 'Valor_Meta_dia') || 0),
+            valorPremio: parseNum(getVal(row, 'VALOR_PREMIO', 'Valor_Premio') || 0)
         }));
 
         localStorage.setItem(METAS_CACHE_KEY, JSON.stringify({

@@ -93,6 +93,7 @@ export interface MetaGoalData {
   periodo: string; // Ex: "Janeiro"
   tipoMeta: number;
   valorMetaDia: number;
+  valorPremio: number;
 }
 
 export interface BaseListItem {

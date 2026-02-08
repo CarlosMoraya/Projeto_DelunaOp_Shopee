@@ -85,7 +85,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
 
   // Lógica de cálculo de performance (similar ao ComparativoATs)
   const dynamicStatus = useMemo(() => {
-    const statusMap = new Map<string, { isAccess: boolean }>();
+    const statusMap = new Map<string, { isAccess: boolean; rewardValue: number | string }>();
 
     if (deliveryData.length === 0 || metasData.length === 0) return statusMap;
 
@@ -113,7 +113,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       days.set(dayKey, dayATs);
     });
 
-    // Calcular Meta 1
+    // Calcular período
     const [y1, m1, d1] = startDate.split('-').map(Number);
     const [y2, m2, d2] = endDate.split('-').map(Number);
     const start = new Date(y1, m1 - 1, d1);
@@ -131,35 +131,64 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
         daysData.forEach(set => currTotal += set.size);
       }
 
-      const metaObj = metasData.find(m =>
+      // Buscar metas para os 3 níveis
+      const getMetaForType = (type: number) => metasData.find(m =>
         normalize(m.base) === normalizedBase &&
         m.periodo.toLowerCase() === currentMonthName.toLowerCase() &&
-        m.tipoMeta === 1
+        m.tipoMeta === type
       );
 
-      const targetMeta = metaObj ? Math.round(metaObj.valorMetaDia * diffDays) : 0;
+      const meta1 = getMetaForType(1);
+      const meta2 = getMetaForType(2);
+      const meta3 = getMetaForType(3);
 
-      // Regra de negócio: Se Atual (ATs) >= Meta 1
-      statusMap.set(row.base, {
-        isAccess: currTotal >= targetMeta && targetMeta > 0
-      });
+      const target1 = meta1 ? Math.round(meta1.valorMetaDia * diffDays) : 0;
+      const target2 = meta2 ? Math.round(meta2.valorMetaDia * diffDays) : 0;
+      const target3 = meta3 ? Math.round(meta3.valorMetaDia * diffDays) : 0;
+
+      const isAccess = currTotal >= target1 && target1 > 0;
+      let rewardValue: number | string = '-';
+
+      if (isAccess) {
+        // Prioridade Meta 3 -> 2 -> 1
+        if (meta3 && currTotal >= target3) rewardValue = meta3.valorPremio;
+        else if (meta2 && currTotal >= target2) rewardValue = meta2.valorPremio;
+        else if (meta1) rewardValue = meta1.valorPremio;
+      }
+
+      statusMap.set(row.base, { isAccess, rewardValue });
     });
 
     return statusMap;
   }, [deliveryData, metasData, startDate, endDate]);
 
+  // Cálculo de dados finais combinando campos estáticos com prêmios dinâmicos
+  const finalLeaderboardData = useMemo(() => {
+    return CAMPANHA_DATA.map(row => {
+      const status = dynamicStatus.get(row.base);
+      const dynamicReward = (status && typeof status.rewardValue === 'number') ? status.rewardValue : 0;
+
+      // Novo total: Prêmio dinâmico + outros pilares estáticos (por enquanto)
+      const currentTotal = dynamicReward + row.qOperacional + row.esforcoCaptacao + row.controlePerdas + row.protagonismo;
+
+      return {
+        ...row,
+        carregamento: dynamicReward, // Sobrescreve com o dinâmico para a UI
+        total: currentTotal
+      };
+    }).sort((a, b) => b.total - a.total);
+  }, [dynamicStatus]);
+
   const filteredLeaders = useMemo(() => {
     if (!searchTerm) return [];
-    return CAMPANHA_DATA.filter(item =>
+    return finalLeaderboardData.filter(item =>
       item.lider.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [searchTerm]);
+  }, [searchTerm, finalLeaderboardData]);
 
   const podiumData = useMemo(() => {
-    return [...CAMPANHA_DATA]
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 3);
-  }, []);
+    return finalLeaderboardData.slice(0, 3);
+  }, [finalLeaderboardData]);
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
@@ -251,7 +280,13 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
                     isText
                     statusColor={dynamicStatus.get(leader.base)?.isAccess ? 'text-green-600' : 'text-red-600'}
                   />
-                  <ValueCard label="Carregamento" value={formatCurrency(leader.carregamento)} sub="Pilar 1" />
+                  <ValueCard
+                    label="Carregamento"
+                    value={typeof dynamicStatus.get(leader.base)?.rewardValue === 'number'
+                      ? formatCurrency(dynamicStatus.get(leader.base)!.rewardValue as number)
+                      : dynamicStatus.get(leader.base)?.rewardValue as string}
+                    sub="Pilar 1"
+                  />
                   <ValueCard label="Q. Operacional" value={formatCurrency(leader.qOperacional)} sub="Pilar 2" />
                   <ValueCard label="Captação" value={formatCurrency(leader.esforcoCaptacao)} sub="Pilar 3" />
                   <ValueCard label="Perdas" value={formatCurrency(leader.controlePerdas)} sub="Pilar 4" />
@@ -316,7 +351,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
               </tr>
             </thead>
             <tbody className="text-[12px] font-medium text-slate-700">
-              {CAMPANHA_DATA.sort((a, b) => b.total - a.total).map((row, i) => (
+              {finalLeaderboardData.map((row, i) => (
                 <tr key={`${row.base}-${i}`} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -342,7 +377,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
                       {dynamicStatus.get(row.base)?.isAccess ? "Acesso a campanha" : "Fora do Jogo"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.carregamento)}</td>
+                  <td className="px-6 py-4 text-center font-manrope font-bold">
+                    {typeof dynamicStatus.get(row.base)?.rewardValue === 'number'
+                      ? formatCurrency(dynamicStatus.get(row.base)!.rewardValue as number)
+                      : dynamicStatus.get(row.base)?.rewardValue}
+                  </td>
                   <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.qOperacional)}</td>
                   <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.esforcoCaptacao)}</td>
                   <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.controlePerdas)}</td>
