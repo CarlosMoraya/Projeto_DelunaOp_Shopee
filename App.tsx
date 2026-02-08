@@ -38,7 +38,7 @@ const App: React.FC = () => {
       case AppView.PROTAGONISMO:
         return <Protagonismo />;
       case AppView.LEADERBOARD:
-        return <Leaderboard />;
+        return <Leaderboard startDate={startDate} endDate={endDate} />;
       default:
         return <DeliverySuccess />;
     }

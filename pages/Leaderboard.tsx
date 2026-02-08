@@ -1,5 +1,11 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { DeliveryData, MetaGoalData } from '../types';
+import { fetchDeliveryData, fetchMetasData } from '../services/api';
 
-import React, { useState, useMemo } from 'react';
+interface LeaderboardProps {
+  startDate: string;
+  endDate: string;
+}
 
 interface CampanhaRow {
   base: string;
@@ -52,8 +58,95 @@ const getDirectImageLink = (url: string) => {
   return url;
 };
 
-const Leaderboard: React.FC = () => {
+const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [deliveryData, setDeliveryData] = useState<DeliveryData[]>([]);
+  const [metasData, setMetasData] = useState<MetaGoalData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [deliveryRes, metasRes] = await Promise.all([
+          fetchDeliveryData(),
+          fetchMetasData()
+        ]);
+        setDeliveryData(deliveryRes);
+        setMetasData(metasRes);
+      } catch (err) {
+        console.error('Erro ao carregar dados no Leaderboard:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Lógica de cálculo de performance (similar ao ComparativoATs)
+  const dynamicStatus = useMemo(() => {
+    const statusMap = new Map<string, { isAccess: boolean }>();
+
+    if (deliveryData.length === 0 || metasData.length === 0) return statusMap;
+
+    const startTime = new Date(startDate).getTime();
+    const endTime = new Date(endDate).getTime();
+    const periodData = deliveryData.filter(row => {
+      const rowDate = new Date(row.date).getTime();
+      return rowDate >= startTime && rowDate <= endTime;
+    });
+
+    const normalize = (s: string) => String(s || '').toUpperCase().replace(/[\s_|-]/g, '').replace(/^LAJ/, 'LRJ');
+
+    // Agrupar ATs por base e dia
+    const basesMap = new Map<string, Map<string, Set<string>>>();
+    periodData.forEach(row => {
+      const base = normalize(row.hub);
+      if (!basesMap.has(base)) basesMap.set(base, new Map());
+      const days = basesMap.get(base)!;
+      const dayKey = row.date;
+      const dayATs = days.get(dayKey) || new Set<string>();
+
+      if (row.atCode) dayATs.add(row.atCode);
+      else dayATs.add(`fallback-${row.id}-${Math.random()}`);
+
+      days.set(dayKey, dayATs);
+    });
+
+    // Calcular Meta 1
+    const [y1, m1, d1] = startDate.split('-').map(Number);
+    const [y2, m2, d2] = endDate.split('-').map(Number);
+    const start = new Date(y1, m1 - 1, d1);
+    const end = new Date(y2, m2 - 1, d2);
+    const diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const monthsNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const currentMonthName = monthsNames[start.getMonth()];
+
+    CAMPANHA_DATA.forEach(row => {
+      const normalizedBase = normalize(row.base);
+      const daysData = basesMap.get(normalizedBase);
+
+      let currTotal = 0;
+      if (daysData) {
+        daysData.forEach(set => currTotal += set.size);
+      }
+
+      const metaObj = metasData.find(m =>
+        normalize(m.base) === normalizedBase &&
+        m.periodo.toLowerCase() === currentMonthName.toLowerCase() &&
+        m.tipoMeta === 1
+      );
+
+      const targetMeta = metaObj ? Math.round(metaObj.valorMetaDia * diffDays) : 0;
+
+      // Regra de negócio: Se Atual (ATs) >= Meta 1
+      statusMap.set(row.base, {
+        isAccess: currTotal >= targetMeta && targetMeta > 0
+      });
+    });
+
+    return statusMap;
+  }, [deliveryData, metasData, startDate, endDate]);
 
   const filteredLeaders = useMemo(() => {
     if (!searchTerm) return [];
@@ -70,6 +163,17 @@ const Leaderboard: React.FC = () => {
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-deluna-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-bold animate-pulse">CARREGANDO DADOS DA CAMPANHA...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[1280px] mx-auto py-10 px-4 md:px-8 font-inter bg-[#F8FAFC] min-h-screen">
@@ -124,15 +228,15 @@ const Leaderboard: React.FC = () => {
             {filteredLeaders.map((leader, idx) => (
               <div key={idx} className="flex flex-col gap-6">
                 {/* Mensagem Condicional */}
-                <div className={`p-6 rounded-2xl flex items-center gap-4 border-l-8 ${leader.regraAcesso
+                <div className={`p-6 rounded-2xl flex items-center gap-4 border-l-8 ${dynamicStatus.get(leader.base)?.isAccess
                   ? 'bg-green-50 border-green-500 text-green-800'
                   : 'bg-red-50 border-red-500 text-red-800'
                   }`}>
                   <span className="material-symbols-outlined text-3xl">
-                    {leader.regraAcesso ? 'celebration' : 'warning'}
+                    {dynamicStatus.get(leader.base)?.isAccess ? 'celebration' : 'warning'}
                   </span>
                   <p className="text-lg font-black uppercase tracking-tight">
-                    {leader.regraAcesso
+                    {dynamicStatus.get(leader.base)?.isAccess
                       ? "Parabéns! Você está garantindo esse valor na sua conta virtual"
                       : "Olha quanto dinheiro você está perdendo! Corre! Ainda dá tempo"}
                   </p>
@@ -140,7 +244,13 @@ const Leaderboard: React.FC = () => {
 
                 {/* Grid de Valores Detalhados */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                  <ValueCard label="Regra" value={leader.regraAcesso || "SEM META"} sub="Acesso" isText />
+                  <ValueCard
+                    label="Meta 1"
+                    value={dynamicStatus.get(leader.base)?.isAccess ? "ACESSO" : "FORA"}
+                    sub="Acesso"
+                    isText
+                    statusColor={dynamicStatus.get(leader.base)?.isAccess ? 'text-green-600' : 'text-red-600'}
+                  />
                   <ValueCard label="Carregamento" value={formatCurrency(leader.carregamento)} sub="Pilar 1" />
                   <ValueCard label="Q. Operacional" value={formatCurrency(leader.qOperacional)} sub="Pilar 2" />
                   <ValueCard label="Captação" value={formatCurrency(leader.esforcoCaptacao)} sub="Pilar 3" />
@@ -196,7 +306,7 @@ const Leaderboard: React.FC = () => {
             <thead>
               <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
                 <th className="px-6 py-4">Base | Líder</th>
-                <th className="px-6 py-4 text-center">Regra</th>
+                <th className="px-6 py-4 text-center">Meta 1</th>
                 <th className="px-6 py-4 text-center">Carr.</th>
                 <th className="px-6 py-4 text-center">Oper.</th>
                 <th className="px-6 py-4 text-center">Captação</th>
@@ -225,11 +335,11 @@ const Leaderboard: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-black ${row.regraAcesso === 'META3' ? 'bg-green-100 text-green-700' :
-                      row.regraAcesso === 'META2' ? 'bg-blue-100 text-blue-700' :
-                        row.regraAcesso === 'META1' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'
+                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${dynamicStatus.get(row.base)?.isAccess
+                      ? 'bg-green-100 text-green-700 border border-green-200'
+                      : 'bg-red-100 text-red-700 border border-red-200'
                       }`}>
-                      {row.regraAcesso || "SEM META"}
+                      {dynamicStatus.get(row.base)?.isAccess ? "Acesso a campanha" : "Fora do Jogo"}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.carregamento)}</td>
@@ -278,10 +388,10 @@ const PodiumCard: React.FC<{ rank: number; data: CampanhaRow; color: string; bor
   </div>
 );
 
-const ValueCard: React.FC<{ label: string; value: string; sub: string; isText?: boolean }> = ({ label, value, sub, isText }) => (
+const ValueCard: React.FC<{ label: string; value: string; sub: string; isText?: boolean; statusColor?: string }> = ({ label, value, sub, isText, statusColor }) => (
   <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm flex flex-col gap-1 transition-all hover:border-deluna-accent group">
     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-    <p className={`text-sm font-black text-deluna-primary ${isText ? 'uppercase' : 'font-manrope'}`}>{value}</p>
+    <p className={`text-sm font-black ${statusColor || 'text-deluna-primary'} ${isText ? 'uppercase' : 'font-manrope'}`}>{value}</p>
     <p className="text-[8px] font-bold text-slate-300 uppercase mt-auto group-hover:text-deluna-accent">{sub}</p>
   </div>
 );
