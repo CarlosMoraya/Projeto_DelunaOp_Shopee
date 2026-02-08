@@ -204,10 +204,12 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
             }
         }
 
-        // 1. Buscar Metadados das Bases para pegar Coordenador
-        const { metadataMap, normalizeBase } = await fetchBaseMetadata(url);
+        // OTIMIZAÇÃO: Dispara os dois requests em paralelo
+        const [{ metadataMap, normalizeBase }, response] = await Promise.all([
+            fetchBaseMetadata(url),
+            fetch(`${url}?tab=QLP`)
+        ]);
 
-        const response = await fetch(`${url}?tab=QLP`);
         if (!response.ok) throw new Error(`Erro na API QLP: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
@@ -254,20 +256,20 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
 
 export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Promise<any[]> => {
     try {
-        console.log("DEBUG Protagonismo: Iniciando fetch...");
+        // OTIMIZAÇÃO: Usa o novo recurso do Script para trazer as duas abas em um único request (Batching)
+        const tabs = encodeURIComponent('Lista de Bases,Respostas');
+        const batchUrl = `${url}?tabs=${tabs}`;
+        console.log("DEBUG Protagonismo: Iniciando batch fetch...", batchUrl);
 
-        // 1. Buscar Lista de Bases
-        const basesUrl = `${url}?tab=${encodeURIComponent('Lista de Bases')}`;
-        console.log("DEBUG Protagonismo: URL de Bases:", basesUrl);
+        const res = await fetch(batchUrl);
+        if (!res.ok) throw new Error(`Erro HTTP ao buscar dados do Protagonismo: ${res.status}`);
 
-        const basesRes = await fetch(basesUrl);
-        if (!basesRes.ok) throw new Error(`Erro HTTP ao buscar Bases: ${basesRes.status}`);
-
-        const rawBases = await basesRes.json();
+        const result = await res.json();
+        const rawBases = result['Lista de Bases'];
+        const rawNotes = result['Respostas'];
 
         if (!Array.isArray(rawBases)) {
-            const errorMsg = typeof rawBases === 'object' && rawBases.error ? rawBases.error : JSON.stringify(rawBases);
-            throw new Error(`Aba 'Lista de Bases' não retornou uma lista. Resposta: ${errorMsg}`);
+            throw new Error(`Aba 'Lista de Bases' não retornou uma lista válida.`);
         }
 
         const baseList = rawBases.map(row => ({
@@ -275,26 +277,13 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
             coord: String(getVal(row, 'Supervisor | Coordenador', 'SUP / COORD', 'SUP/COORD', 'COORDENADOR', 'COORD', 'SUPERVISOR') || ''),
             lider: String(getVal(row, 'LÍDER ATUAL', 'LIDER ATUAL', 'LÍDER', 'LIDER', 'LEADER') || ''),
             localidade: String(getVal(row, 'LOCALIDADE', 'LOCAL', 'CIDADE', 'HUB') || ''),
-            _raw_debug: row // Para debug visual na interface
+            _raw_debug: row
         })).filter(b => b.base && b.base !== 'undefined');
-
-        // 2. Buscar Notas
-        const notesUrl = `${url}?tab=${encodeURIComponent('Respostas')}`;
-        console.log("DEBUG Protagonismo: URL de Notas:", notesUrl);
-
-        const notesRes = await fetch(notesUrl);
-        if (!notesRes.ok) throw new Error(`Erro HTTP ao buscar Notas: ${notesRes.status}`);
-
-        const rawNotes = await notesRes.json();
-
-        if (!Array.isArray(rawNotes)) {
-            console.warn("DEBUG Protagonismo: rawNotes não é um array!", rawNotes);
-        }
 
         // 3. Agrupar notas por base (média)
         const notesMap = new Map<string, { sum: number, count: number }>();
         if (Array.isArray(rawNotes)) {
-            rawNotes.forEach((row, idx) => {
+            rawNotes.forEach((row) => {
                 // Tenta pegar a base (geralmente a pergunta de qual é a base)
                 const baseRaw = getVal(row, 'BASE_OP', 'BASE', 'BASES', 'QUAL A SUA BASE', 'QUAL A BASE');
                 const base = String(baseRaw || '').toUpperCase().trim();
