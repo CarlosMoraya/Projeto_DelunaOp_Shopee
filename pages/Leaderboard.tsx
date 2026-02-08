@@ -23,17 +23,34 @@ const CAMPANHA_DATA: CampanhaRow[] = [
   { base: 'LES09', localidade: 'Viana', lider: 'Cristiane', avatar: 'https://picsum.photos/seed/cristiane/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 100, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 950 },
   { base: 'LRJ12', localidade: 'Nova Iguaçu', lider: 'Patrick', avatar: 'https://picsum.photos/seed/patrick/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
   { base: 'LRJ04', localidade: 'Campo G', lider: 'Andreia', avatar: 'https://picsum.photos/seed/andreia/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LRJ23', localidade: 'São Gonçalo 2', lider: 'Rafael', avatar: 'https://picsum.photos/seed/rafael/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 25, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 875 },
-  { base: 'LRJ07', localidade: 'São Cristóvão', lider: 'Thais', avatar: 'https://picsum.photos/seed/thais/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
+  { base: 'LRJ23', localidade: 'São Gonçalo 2', lider: 'Rafael', avatar: '/avatars/Rafael.jpeg', regraAcesso: 'META3', carregamento: 500, qOperacional: 25, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 875 },
+  { base: 'LRJ07', localidade: 'São Cristóvão', lider: 'Thais', avatar: '/avatars/Thais.jpeg', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
   { base: 'LBA14', localidade: 'Camaçari', lider: 'Lucineide', avatar: 'https://picsum.photos/seed/lucineide/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 25, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 875 },
   { base: 'LRJ05', localidade: 'Macaé', lider: 'Rafael', avatar: 'https://picsum.photos/seed/rafael2/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LRJ02', localidade: 'Nova Friburgo', lider: 'Cristiane', avatar: 'https://picsum.photos/seed/cristiane2/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LRJ21', localidade: 'Cabo Frio', lider: 'Eduardo', avatar: 'https://picsum.photos/seed/eduardo/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
+  { base: 'LRJ02', localidade: 'Nova Friburgo', lider: 'Cristiane', avatar: '/avatars/Christiane.jpeg', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
+  { base: 'LRJ21', localidade: 'Cabo Frio', lider: 'Eduardo', avatar: '/avatars/Eduardo.jpeg', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
   { base: 'LRJ15', localidade: 'Magé', lider: 'Poliana', avatar: 'https://picsum.photos/seed/poliana/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
   { base: 'LBA18', localidade: 'Salvador', lider: 'Adriana', avatar: 'https://picsum.photos/seed/adriana/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
   { base: 'LBA17', localidade: 'Simões Filho', lider: 'Luiza', avatar: 'https://picsum.photos/seed/luiza/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
   { base: 'LRJ99', localidade: 'Teste', lider: 'Líder Sem Meta', avatar: 'https://picsum.photos/seed/semmeta/200/200', regraAcesso: '', carregamento: 0, qOperacional: 0, esforcoCaptacao: 0, controlePerdas: 0, protagonismo: 0, total: 0 },
 ];
+
+const getDirectImageLink = (url: string) => {
+  if (!url) return '';
+  // Se o link já for um caminho local (começando com /)
+  if (url.startsWith('/')) return url;
+
+  if (url.includes('drive.google.com')) {
+    const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    const id = idMatch ? idMatch[1] : null;
+    if (id) {
+      // Este endpoint é o que o navegador usou no teste anterior e funcionou.
+      // Ele gera uma imagem real que o navegador aceita renderizar.
+      return `https://drive.google.com/thumbnail?id=${id}&sz=w200`;
+    }
+  }
+  return url;
+};
 
 const Leaderboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -133,7 +150,14 @@ const Leaderboard: React.FC = () => {
 
                 <div className="bg-deluna-primary p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center text-white mt-4 shadow-xl">
                   <div className="flex items-center gap-6">
-                    <div className="size-20 rounded-full bg-cover bg-center border-4 border-white/20" style={{ backgroundImage: `url('${leader.avatar}')` }}></div>
+                    <div className="size-20 rounded-full overflow-hidden border-4 border-white/20 bg-slate-800">
+                      <img
+                        src={getDirectImageLink(leader.avatar)}
+                        alt={leader.lider}
+                        className="w-full h-full object-cover"
+                        onError={(e) => (e.currentTarget.src = `https://ui-avatars.com/api/?name=${leader.lider}&background=random`)}
+                      />
+                    </div>
                     <div className="flex flex-col gap-1 text-center md:text-left mb-4 md:mb-0">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Total Acumulado na Campanha</p>
                       <h4 className="text-4xl font-black font-manrope">{formatCurrency(leader.total)}</h4>
@@ -186,7 +210,14 @@ const Leaderboard: React.FC = () => {
                 <tr key={`${row.base}-${i}`} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="size-8 rounded-full bg-cover bg-center border border-slate-200" style={{ backgroundImage: `url('${row.avatar}')` }}></div>
+                      <div className="size-8 rounded-full overflow-hidden border border-slate-200 bg-slate-100">
+                        <img
+                          src={getDirectImageLink(row.avatar)}
+                          alt={row.lider}
+                          className="w-full h-full object-cover"
+                          onError={(e) => (e.currentTarget.src = `https://ui-avatars.com/api/?name=${row.lider}&background=random`)}
+                        />
+                      </div>
                       <div className="flex flex-col">
                         <span className="font-black text-deluna-primary">{row.lider}</span>
                         <span className="text-[10px] text-slate-400 uppercase font-bold">{row.base} - {row.localidade}</span>
@@ -221,11 +252,13 @@ const PodiumCard: React.FC<{ rank: number; data: CampanhaRow; color: string; bor
   <div className={`bg-white rounded-[2rem] border-2 ${border} p-6 text-center shadow-xl transition-all hover:-translate-y-4 flex flex-col items-center group ${primary ? 'h-[420px] z-10 scale-105 md:scale-110' : 'h-[340px]'}`}>
 
     <div className="relative mb-6">
-      <div className={`rounded-full overflow-hidden border-4 ${primary ? 'size-32 border-deluna-gold' : 'size-24 border-slate-200'} shadow-2xl`}>
-        <div
-          className="w-full h-full bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
-          style={{ backgroundImage: `url('${data.avatar}')` }}
-        ></div>
+      <div className={`rounded-full overflow-hidden border-4 ${primary ? 'size-32 border-deluna-gold' : 'size-24 border-slate-200'} shadow-2xl bg-slate-100`}>
+        <img
+          src={getDirectImageLink(data.avatar)}
+          alt={data.lider}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          onError={(e) => (e.currentTarget.src = `https://ui-avatars.com/api/?name=${data.lider}&background=random`)}
+        />
       </div>
       <div className={`absolute -bottom-2 right-0 size-10 rounded-full flex items-center justify-center text-white font-black text-lg border-4 border-white shadow-lg ${color}`}>
         {rank}

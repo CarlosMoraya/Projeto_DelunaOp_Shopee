@@ -277,6 +277,7 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
             coord: String(getVal(row, 'Supervisor | Coordenador', 'SUP / COORD', 'SUP/COORD', 'COORDENADOR', 'COORD', 'SUPERVISOR') || ''),
             lider: String(getVal(row, 'LÍDER ATUAL', 'LIDER ATUAL', 'LÍDER', 'LIDER', 'LEADER') || ''),
             localidade: String(getVal(row, 'LOCALIDADE', 'LOCAL', 'CIDADE', 'HUB') || ''),
+            avatar: String(getVal(row, 'AVATAR', 'FOTO', 'URL') || ''),
             _raw_debug: row
         })).filter(b => b.base && b.base !== 'undefined');
 

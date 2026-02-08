@@ -100,6 +100,7 @@ export interface BaseListItem {
   coord: string;
   lider: string;
   localidade: string;
+  avatar?: string;
 }
 
 export interface ProtagonismoNote {

@@ -3,6 +3,19 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ProtagonismoRow } from '../types';
 import { fetchProtagonismoData } from '../services/api';
 
+const getDirectImageLink = (url: string) => {
+  if (!url) return '';
+  if (url.startsWith('/')) return url;
+  if (url.includes('drive.google.com')) {
+    const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    const id = idMatch ? idMatch[1] : null;
+    if (id) {
+      return `https://drive.google.com/thumbnail?id=${id}&sz=w200`;
+    }
+  }
+  return url;
+};
+
 const Protagonismo: React.FC = () => {
   const [allData, setAllData] = useState<ProtagonismoRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,6 +125,7 @@ const Protagonismo: React.FC = () => {
                   lider={podiumData[1].lider}
                   base={podiumData[1].base}
                   score={podiumData[1].resultado}
+                  avatar={podiumData[1].avatar}
                   color="bg-slate-300"
                 />
               )}
@@ -121,6 +135,7 @@ const Protagonismo: React.FC = () => {
                   lider={podiumData[0].lider}
                   base={podiumData[0].base}
                   score={podiumData[0].resultado}
+                  avatar={podiumData[0].avatar}
                   color="bg-deluna-gold"
                   primary
                 />
@@ -131,6 +146,7 @@ const Protagonismo: React.FC = () => {
                   lider={podiumData[2].lider}
                   base={podiumData[2].base}
                   score={podiumData[2].resultado}
+                  avatar={podiumData[2].avatar}
                   color="bg-[#AD8A56]"
                 />
               )}
@@ -169,7 +185,19 @@ const Protagonismo: React.FC = () => {
                       <tr key={`${row.base}-${i}`} className={`${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'} border-b border-slate-100 hover:bg-deluna-primary/5 transition-colors`}>
                         <td className="px-6 py-4 font-black text-deluna-primary border-r border-slate-100 uppercase">{row.base}</td>
                         <td className="px-6 py-4 font-bold text-slate-400 border-r border-slate-100 italic">{row.localidade}</td>
-                        <td className="px-6 py-4 font-semibold border-r border-slate-100 uppercase tracking-tight">{row.lider}</td>
+                        <td className="px-6 py-4 border-r border-slate-100 uppercase tracking-tight">
+                          <div className="flex items-center gap-3">
+                            <div className="size-8 rounded-full overflow-hidden border border-slate-200 bg-slate-100">
+                              <img
+                                src={getDirectImageLink(row.avatar || '')}
+                                alt={row.lider}
+                                className="w-full h-full object-cover"
+                                onError={(e) => (e.currentTarget.src = `https://ui-avatars.com/api/?name=${row.lider}&background=random`)}
+                              />
+                            </div>
+                            <span className="font-semibold">{row.lider}</span>
+                          </div>
+                        </td>
                         <td className="px-6 py-4 font-medium border-r border-slate-100 text-slate-500 uppercase text-[10px] tracking-wider">{row.coord}</td>
                         <td className={`px-6 py-4 text-center font-black text-base ${(row as any)._debug_count > 0 ? 'bg-slate-100/50 text-deluna-primary' : 'bg-slate-50/30 text-slate-300'}`}>
                           {row.resultado.toFixed(1)}
@@ -222,18 +250,28 @@ const Protagonismo: React.FC = () => {
   );
 };
 
-const PodiumCard: React.FC<{ rank: number; lider: string; base: string; score: number; color: string; primary?: boolean }> =
-  ({ rank, lider, base, score, color, primary }) => (
-    <div className={`flex flex-col items-center p-8 rounded-3xl border border-slate-100 bg-white shadow-xl transition-all hover:scale-105 group ${primary ? 'md:-mb-4 z-10 border-deluna-gold/20' : 'h-[300px]'}`}>
-      <div className={`size-14 rounded-2xl flex items-center justify-center text-white font-black text-2xl mb-6 shadow-lg rotate-3 group-hover:rotate-0 transition-transform ${color}`}>
-        {rank}
+const PodiumCard: React.FC<{ rank: number; lider: string; base: string; score: number; color: string; avatar?: string; primary?: boolean }> =
+  ({ rank, lider, base, score, color, avatar, primary }) => (
+    <div className={`flex flex-col items-center p-8 rounded-3xl border border-slate-100 bg-white shadow-xl transition-all hover:scale-105 group ${primary ? 'md:-mb-4 z-10 border-deluna-gold/20' : 'h-[360px]'}`}>
+      <div className="relative mb-6">
+        <div className={`rounded-full overflow-hidden border-4 ${primary ? 'size-24 border-deluna-gold' : 'size-20 border-slate-100'} shadow-xl bg-slate-50`}>
+          <img
+            src={getDirectImageLink(avatar || '')}
+            alt={lider}
+            className="w-full h-full object-cover"
+            onError={(e) => (e.currentTarget.src = `https://ui-avatars.com/api/?name=${lider}&background=random`)}
+          />
+        </div>
+        <div className={`absolute -bottom-2 -right-2 size-9 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg rotate-3 group-hover:rotate-0 transition-transform ${color}`}>
+          {rank}
+        </div>
       </div>
       <div className="text-center flex-1">
         <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2">{base}</p>
         <h3 className={`font-black text-deluna-primary uppercase ${primary ? 'text-2xl' : 'text-xl'}`}>{lider}</h3>
-        <div className="mt-8 pt-6 border-t border-slate-50 flex flex-col items-center">
+        <div className="mt-4 pt-4 border-t border-slate-50 flex flex-col items-center">
           <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Resultado Final</p>
-          <p className={`text-5xl font-black tracking-tighter ${primary ? 'text-deluna-gold' : 'text-deluna-primary opacity-80'}`}>{score.toFixed(1)}</p>
+          <p className={`text-4xl font-black tracking-tighter ${primary ? 'text-deluna-gold' : 'text-deluna-primary opacity-80'}`}>{score.toFixed(1)}</p>
         </div>
       </div>
     </div>
