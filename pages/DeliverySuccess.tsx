@@ -200,35 +200,85 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
     };
   }, [filteredTableData, previousPeriodData]);
 
-  // Histograma dinâmico baseado no filtro
+  // Histograma dinâmico baseado no filtro de visualização (Dia, Semana, Mês)
   const dynamicHistoryData = useMemo(() => {
-    const grouped = new Map<string, { ats: number, delivered: number }>();
+    const grouped = new Map<string, { ats: number, delivered: number, sortKey: string, dateObj: Date }>();
 
     filteredTableData.forEach(row => {
-      // Agrupa por data (YYYY-MM-DD)
-      const label = row.date || 'S/D';
-      const current = grouped.get(label) || { ats: 0, delivered: 0 };
-      grouped.set(label, {
+      const date = new Date(row.date);
+      if (isNaN(date.getTime())) return;
+
+      let groupKey = '';
+      let label = '';
+      let sortKey = '';
+
+      if (historyRange === 'day') {
+        groupKey = row.date;
+        label = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        sortKey = row.date;
+      } else if (historyRange === 'week') {
+        // Calcular início da semana (domingo)
+        const day = date.getDay();
+        const diff = date.getDate() - day;
+        const startOfWeek = new Date(date);
+        startOfWeek.setDate(diff);
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        groupKey = `W-${startOfWeek.getFullYear()}-${startOfWeek.getMonth()}-${startOfWeek.getDate()}`;
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+        label = `Sem ${startOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+        sortKey = startOfWeek.toISOString();
+      } else if (historyRange === 'month') {
+        groupKey = `${date.getFullYear()}-${date.getMonth()}`;
+        label = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).toUpperCase();
+        sortKey = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
+      }
+
+      const current = grouped.get(groupKey) || { ats: 0, delivered: 0, sortKey, dateObj: date };
+      grouped.set(groupKey, {
+        ...current,
         ats: current.ats + row.atQuantity,
         delivered: current.delivered + row.delivered
       });
     });
 
-    const entries = Array.from(grouped.entries())
-      .map(([label, stats]) => ({
-        label: new Date(label).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+    // Helper para extrair número da semana (ISO-8601)
+    const getWeekNumber = (d: Date) => {
+      d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+      return weekNo;
+    };
+
+    const result = Array.from(grouped.entries()).map(([key, stats]) => {
+      let displayLabel = '';
+      const d = new Date(stats.sortKey);
+      if (historyRange === 'day') {
+        displayLabel = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      } else if (historyRange === 'week') {
+        displayLabel = `W${getWeekNumber(d)}`;
+      } else if (historyRange === 'month') {
+        displayLabel = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).toUpperCase();
+      }
+
+      return {
+        label: displayLabel,
         ats: stats.ats,
         rate: stats.ats > 0 ? Math.round((stats.delivered / stats.ats) * 1000) / 10 : 0,
-        sortKey: label
-      }))
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+        sortKey: stats.sortKey
+      };
+    }).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
-    return {
-      day: entries.slice(-7), // Ultimos 7 dias se for "dia"
-      week: entries.slice(-14),
-      month: entries
-    };
-  }, [filteredTableData]);
+    // Aplicar limites para não poluir o gráfico
+    if (historyRange === 'day') return result.slice(-30);    // Max 30 dias
+    if (historyRange === 'week') return result.slice(-12);   // Max 12 semanas
+    if (historyRange === 'month') return result;             // Meses costuma ser pouco
+
+    return result;
+  }, [filteredTableData, historyRange]);
 
   const dynamicCoordinatorData = useMemo(() => {
     const map = new Map<string, { totalAt: number, totalDelivered: number }>();
@@ -410,7 +460,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
 
         <div className="h-64 md:h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={dynamicHistoryData[historyRange]} margin={{ top: 20, right: 0, bottom: 20, left: 0 }}>
+            <ComposedChart data={dynamicHistoryData} margin={{ top: 20, right: 0, bottom: 20, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis
                 dataKey="label"
