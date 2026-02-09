@@ -1,5 +1,5 @@
 
-import { DeliveryData, QLPData, MetaGoalData } from '../types';
+import { DeliveryData, QLPData, MetaGoalData, MetaDSData } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
@@ -7,6 +7,7 @@ export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9
 const CACHE_KEY = 'delivery_data_cache_v5';
 const QLP_CACHE_KEY = 'qlp_data_cache_v2';
 const METAS_CACHE_KEY = 'metas_data_cache_v2';
+const METAS_DS_CACHE_KEY = 'metas_ds_data_cache_v1';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 // --- HELPER FUNCTIONS ---
@@ -191,6 +192,39 @@ export const fetchMetasData = async (url: string = GOOGLE_SCRIPT_URL): Promise<M
         return processed;
     } catch (error) {
         console.error("Erro ao carregar Metas:", error);
+        return [];
+    }
+};
+
+export const fetchMetasDSData = async (url: string = GOOGLE_SCRIPT_URL): Promise<MetaDSData[]> => {
+    try {
+        const cached = localStorage.getItem(METAS_DS_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                return data;
+            }
+        }
+
+        const response = await fetch(`${url}?tab=Metas_DS`);
+        if (!response.ok) throw new Error(`Erro na API Metas_DS: ${response.statusText}`);
+
+        const rawData: any[] = await response.json();
+        const processed = rawData.map(row => ({
+            base: String(getVal(row, 'BASES') || '').trim(),
+            tipoMeta: Number(getVal(row, 'TIPO_META', 'Tipo_Meta') || 0),
+            valorMetaDS: parseNum(getVal(row, 'VALOR_META_DS', 'Valor_Meta_DS') || 0),
+            valorPremio: parseNum(getVal(row, 'VALOR_PREMIO', 'Valor_Premio') || 0)
+        }));
+
+        localStorage.setItem(METAS_DS_CACHE_KEY, JSON.stringify({
+            data: processed,
+            timestamp: Date.now()
+        }));
+
+        return processed;
+    } catch (error) {
+        console.error("Erro ao carregar Metas_DS:", error);
         return [];
     }
 };

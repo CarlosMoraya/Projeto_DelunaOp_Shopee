@@ -96,6 +96,13 @@ export interface MetaGoalData {
   valorPremio: number;
 }
 
+export interface MetaDSData {
+  base: string;
+  tipoMeta: number; // 1, 2, 3
+  valorMetaDS: number;
+  valorPremio: number;
+}
+
 export interface BaseListItem {
   base: string;
   coord: string;

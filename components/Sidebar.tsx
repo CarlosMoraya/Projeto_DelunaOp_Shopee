@@ -29,7 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onCl
         <div className="flex items-center justify-between px-6">
           <div className="flex items-center gap-3">
             <div className="bg-white/10 p-2 rounded-lg">
-              <span className="material-symbols-outlined text-white">local_shipping</span>
+              <span className="material-symbols-outlined text-white">local_shipping</span>  
             </div>
             <div className="flex flex-col">
               <h1 className="text-white text-sm font-black leading-tight uppercase tracking-tighter">Operação Shopee</h1>

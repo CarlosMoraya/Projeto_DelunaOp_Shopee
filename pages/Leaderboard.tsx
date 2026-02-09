@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DeliveryData, MetaGoalData } from '../types';
-import { fetchDeliveryData, fetchMetasData } from '../services/api';
+import { DeliveryData, MetaGoalData, MetaDSData } from '../types';
+import { fetchDeliveryData, fetchMetasData, fetchMetasDSData } from '../services/api';
 
 interface LeaderboardProps {
   startDate: string;
@@ -62,18 +62,21 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [deliveryData, setDeliveryData] = useState<DeliveryData[]>([]);
   const [metasData, setMetasData] = useState<MetaGoalData[]>([]);
+  const [metasDSData, setMetasDSData] = useState<MetaDSData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [deliveryRes, metasRes] = await Promise.all([
+        const [deliveryRes, metasRes, metasDSRes] = await Promise.all([
           fetchDeliveryData(),
-          fetchMetasData()
+          fetchMetasData(),
+          fetchMetasDSData()
         ]);
         setDeliveryData(deliveryRes);
         setMetasData(metasRes);
+        setMetasDSData(metasDSRes);
       } catch (err) {
         console.error('Erro ao carregar dados no Leaderboard:', err);
       } finally {
@@ -85,7 +88,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
 
   // Lógica de cálculo de performance (similar ao ComparativoATs)
   const dynamicStatus = useMemo(() => {
-    const statusMap = new Map<string, { isAccess: boolean; rewardValue: number | string }>();
+    const statusMap = new Map<string, { isAccess: boolean; rewardValue: number | string; operationalReward: number | string }>();
 
     if (deliveryData.length === 0 || metasData.length === 0) return statusMap;
 
@@ -127,11 +130,21 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       const daysData = basesMap.get(normalizedBase);
 
       let currTotal = 0;
+      let totalDelivered = 0;
+      let totalRemessas = 0;
+
       if (daysData) {
         daysData.forEach(set => currTotal += set.size);
+
+        // Calcular DS (Delivery Success %) para a base no período
+        const basePeriodData = periodData.filter(d => normalize(d.hub) === normalizedBase);
+        totalRemessas = basePeriodData.reduce((sum, d) => sum + d.atQuantity, 0);
+        totalDelivered = basePeriodData.reduce((sum, d) => sum + d.delivered, 0);
       }
 
-      // Buscar metas para os 3 níveis
+      const dsRate = totalRemessas > 0 ? (totalDelivered / totalRemessas) * 100 : 0;
+
+      // Buscar metas de volume (Meta 1, 2, 3)
       const getMetaForType = (type: number) => metasData.find(m =>
         normalize(m.base) === normalizedBase &&
         m.periodo.toLowerCase() === currentMonthName.toLowerCase() &&
@@ -147,33 +160,51 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       const target3 = meta3 ? Math.round(meta3.valorMetaDia * diffDays) : 0;
 
       const isAccess = currTotal >= target1 && target1 > 0;
-      let rewardValue: number | string = '-';
 
+      // Regra de Negócio: Coluna Carregamento (Carr.)
+      let rewardValue: number | string = '-';
       if (isAccess) {
-        // Prioridade Meta 3 -> 2 -> 1
         if (meta3 && currTotal >= target3) rewardValue = meta3.valorPremio;
         else if (meta2 && currTotal >= target2) rewardValue = meta2.valorPremio;
         else if (meta1) rewardValue = meta1.valorPremio;
       }
 
-      statusMap.set(row.base, { isAccess, rewardValue });
+      // NOVO: Regra de Negócio para Coluna Operacional (Oper.)
+      let operationalReward: number | string = '-';
+      if (isAccess) {
+        // Buscar metas de DS para esta base
+        const getMetaDS = (type: number) => metasDSData.find(m => normalize(m.base) === normalizedBase && m.tipoMeta === type);
+
+        const mds1 = getMetaDS(1);
+        const mds2 = getMetaDS(2);
+        const mds3 = getMetaDS(3);
+
+        if (mds3 && dsRate >= mds3.valorMetaDS) operationalReward = mds3.valorPremio;
+        else if (mds2 && dsRate >= mds2.valorMetaDS) operationalReward = mds2.valorPremio;
+        else if (mds1 && dsRate >= mds1.valorMetaDS) operationalReward = mds1.valorPremio;
+        else operationalReward = 0; // Ganha 0 se tiver acesso mas não atingir DS 1
+      }
+
+      statusMap.set(row.base, { isAccess, rewardValue, operationalReward });
     });
 
     return statusMap;
-  }, [deliveryData, metasData, startDate, endDate]);
+  }, [deliveryData, metasData, metasDSData, startDate, endDate]);
 
   // Cálculo de dados finais combinando campos estáticos com prêmios dinâmicos
   const finalLeaderboardData = useMemo(() => {
     return CAMPANHA_DATA.map(row => {
       const status = dynamicStatus.get(row.base);
       const dynamicReward = (status && typeof status.rewardValue === 'number') ? status.rewardValue : 0;
+      const operReward = (status && typeof status.operationalReward === 'number') ? status.operationalReward : 0;
 
-      // Novo total: Prêmio dinâmico + outros pilares estáticos (por enquanto)
-      const currentTotal = dynamicReward + row.qOperacional + row.esforcoCaptacao + row.controlePerdas + row.protagonismo;
+      // Novo total: Carr. dinâmico + Oper. dinâmico + outros pilares estáticos
+      const currentTotal = dynamicReward + operReward + row.esforcoCaptacao + row.controlePerdas + row.protagonismo;
 
       return {
         ...row,
-        carregamento: dynamicReward, // Sobrescreve com o dinâmico para a UI
+        carregamento: dynamicReward,
+        qOperacional: operReward, // Sobrescreve com o dinâmico de DS
         total: currentTotal
       };
     }).sort((a, b) => b.total - a.total);
@@ -287,7 +318,13 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
                       : dynamicStatus.get(leader.base)?.rewardValue as string}
                     sub="Pilar 1"
                   />
-                  <ValueCard label="Q. Operacional" value={formatCurrency(leader.qOperacional)} sub="Pilar 2" />
+                  <ValueCard
+                    label="Operativo"
+                    value={typeof dynamicStatus.get(leader.base)?.operationalReward === 'number'
+                      ? formatCurrency(dynamicStatus.get(leader.base)!.operationalReward as number)
+                      : dynamicStatus.get(leader.base)?.operationalReward as string}
+                    sub="Pilar 2"
+                  />
                   <ValueCard label="Captação" value={formatCurrency(leader.esforcoCaptacao)} sub="Pilar 3" />
                   <ValueCard label="Perdas" value={formatCurrency(leader.controlePerdas)} sub="Pilar 4" />
                   <ValueCard label="Protagonismo" value={formatCurrency(leader.protagonismo)} sub="Pilar 5" />
@@ -382,7 +419,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
                       ? formatCurrency(dynamicStatus.get(row.base)!.rewardValue as number)
                       : dynamicStatus.get(row.base)?.rewardValue}
                   </td>
-                  <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.qOperacional)}</td>
+                  <td className="px-6 py-4 text-center font-manrope">
+                    {typeof dynamicStatus.get(row.base)?.operationalReward === 'number'
+                      ? formatCurrency(dynamicStatus.get(row.base)!.operationalReward as number)
+                      : dynamicStatus.get(row.base)?.operationalReward}
+                  </td>
                   <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.esforcoCaptacao)}</td>
                   <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.controlePerdas)}</td>
                   <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.protagonismo)}</td>
