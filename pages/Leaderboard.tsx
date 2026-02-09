@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DeliveryData, MetaGoalData, MetaDSData, QLPData, MetaCaptacaoData } from '../types';
-import { fetchDeliveryData, fetchMetasData, fetchMetasDSData, fetchQLPData, fetchMetasCaptacaoData } from '../services/api';
+import { DeliveryData, MetaGoalData, MetaDSData, QLPData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow } from '../types';
+import { fetchDeliveryData, fetchMetasData, fetchMetasDSData, fetchQLPData, fetchMetasCaptacaoData, fetchMetaProtagonismoData, fetchProtagonismoData } from '../services/api';
 
 interface LeaderboardProps {
   startDate: string;
@@ -65,24 +65,30 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
   const [metasDSData, setMetasDSData] = useState<MetaDSData[]>([]);
   const [qlpData, setQlpData] = useState<QLPData[]>([]);
   const [metasCaptacaoData, setMetasCaptacaoData] = useState<MetaCaptacaoData[]>([]);
+  const [protagonismoData, setProtagonismoData] = useState<ProtagonismoRow[]>([]);
+  const [metasProtagonismoData, setMetasProtagonismoData] = useState<MetaProtagonismoData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [deliveryRes, metasRes, metasDSRes, qlpRes, metasCaptacaoRes] = await Promise.all([
+        const [deliveryRes, metasRes, metasDSRes, qlpRes, metasCaptacaoRes, protRes, metasProtRes] = await Promise.all([
           fetchDeliveryData(),
           fetchMetasData(),
           fetchMetasDSData(),
           fetchQLPData(),
-          fetchMetasCaptacaoData()
+          fetchMetasCaptacaoData(),
+          fetchProtagonismoData(),
+          fetchMetaProtagonismoData()
         ]);
         setDeliveryData(deliveryRes);
         setMetasData(metasRes);
         setMetasDSData(metasDSRes);
         setQlpData(qlpRes);
         setMetasCaptacaoData(metasCaptacaoRes);
+        setProtagonismoData(protRes);
+        setMetasProtagonismoData(metasProtRes);
       } catch (err) {
         console.error('Erro ao carregar dados no Leaderboard:', err);
       } finally {
@@ -99,6 +105,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       rewardValue: number | string;
       operationalReward: number | string;
       captacaoReward: number | string;
+      protagonismoReward: number | string;
     }>();
 
     if (deliveryData.length === 0 || metasData.length === 0) return statusMap;
@@ -133,8 +140,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
     const start = new Date(y1, m1 - 1, d1);
     const end = new Date(y2, m2 - 1, d2);
     const diffDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const removeAccents = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const monthsNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
     const currentMonthName = monthsNames[start.getMonth()];
+    const normalizedMonth = removeAccents(currentMonthName).toLowerCase();
 
     CAMPANHA_DATA.forEach(row => {
       const normalizedBase = normalize(row.base);
@@ -162,7 +171,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       // Buscar metas de volume (Meta 1, 2, 3)
       const getMetaForType = (type: number) => metasData.find(m =>
         normalize(m.base) === normalizedBase &&
-        m.periodo.toLowerCase() === currentMonthName.toLowerCase() &&
+        removeAccents(m.periodo).toLowerCase() === normalizedMonth &&
         m.tipoMeta === type
       );
 
@@ -232,11 +241,40 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
         }
       }
 
-      statusMap.set(row.base, { isAccess, rewardValue, operationalReward, captacaoReward });
+      // NOVO: Regra de Negócio para Coluna Protagonismo (Pilar 5)
+      let protagonismoReward: number | string = '-';
+      if (isAccess) {
+        const protResult = protagonismoData.find(p => normalize(p.base) === normalizedBase);
+        const notaProt = protResult ? protResult.resultado : 0;
+
+        const getMetaProt = (type: number) => metasProtagonismoData.find(m =>
+          normalize(m.base) === normalizedBase &&
+          m.tipoMeta === type &&
+          (removeAccents(m.periodo).toLowerCase() === normalizedMonth || m.periodo === '')
+        );
+
+        const mp1 = getMetaProt(1);
+        const mp2 = getMetaProt(2);
+        const mp3 = getMetaProt(3);
+
+        if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') {
+          console.log(`DEBUG PROTAG [${normalizedBase}]: Nota=${notaProt.toFixed(2)} | Metas: M1=${mp1?.valorMetaProtagonismo} M2=${mp2?.valorMetaProtagonismo} M3=${mp3?.valorMetaProtagonismo}`);
+        }
+
+        if (mp3 && notaProt >= mp3.valorMetaProtagonismo) protagonismoReward = mp3.valorPremio;
+        else if (mp2 && notaProt >= mp2.valorMetaProtagonismo) protagonismoReward = mp2.valorPremio;
+        else if (mp1 && notaProt >= mp1.valorMetaProtagonismo) protagonismoReward = mp1.valorPremio;
+        else {
+          protagonismoReward = 0;
+          if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') console.log(`DEBUG RESULT PROTAG [${normalizedBase}]: Meta não atingida.`);
+        }
+      }
+
+      statusMap.set(row.base, { isAccess, rewardValue, operationalReward, captacaoReward, protagonismoReward });
     });
 
     return statusMap;
-  }, [deliveryData, metasData, metasDSData, qlpData, metasCaptacaoData, startDate, endDate]);
+  }, [deliveryData, metasData, metasDSData, qlpData, metasCaptacaoData, protagonismoData, metasProtagonismoData, startDate, endDate]);
 
   // Cálculo de dados finais combinando campos estáticos com prêmios dinâmicos
   const finalLeaderboardData = useMemo(() => {
@@ -245,15 +283,17 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       const dynamicReward = (status && typeof status.rewardValue === 'number') ? status.rewardValue : 0;
       const operReward = (status && typeof status.operationalReward === 'number') ? status.operationalReward : 0;
       const captReward = (status && typeof status.captacaoReward === 'number') ? status.captacaoReward : 0;
+      const protReward = (status && typeof status.protagonismoReward === 'number') ? status.protagonismoReward : 0;
 
-      // Novo total: Carr. dinâmico + Oper. dinâmico + Captação dinâmico + outros pilares estáticos
-      const currentTotal = dynamicReward + operReward + captReward + row.controlePerdas + row.protagonismo;
+      // Novo total: Carr. dinâmico + Oper. dinâmico + Captação dinâmico + Perdas estático + Protagonismo dinâmico
+      const currentTotal = dynamicReward + operReward + captReward + row.controlePerdas + protReward;
 
       return {
         ...row,
         carregamento: dynamicReward,
         qOperacional: operReward,
-        esforcoCaptacao: captReward, // Sobrescreve com o dinâmico do QLP
+        esforcoCaptacao: captReward,
+        protagonismo: protReward, // Sobrescreve com o dinâmico de Protagonismo
         total: currentTotal
       };
     }).sort((a, b) => b.total - a.total);
@@ -382,7 +422,13 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
                     sub="Pilar 3"
                   />
                   <ValueCard label="Perdas" value={formatCurrency(leader.controlePerdas)} sub="Pilar 4" />
-                  <ValueCard label="Protagonismo" value={formatCurrency(leader.protagonismo)} sub="Pilar 5" />
+                  <ValueCard
+                    label="Protagonismo"
+                    value={typeof dynamicStatus.get(leader.base)?.protagonismoReward === 'number'
+                      ? formatCurrency(dynamicStatus.get(leader.base)!.protagonismoReward as number)
+                      : dynamicStatus.get(leader.base)?.protagonismoReward as string}
+                    sub="Pilar 5"
+                  />
                 </div>
 
                 <div className="bg-deluna-primary p-8 rounded-3xl flex flex-col md:flex-row justify-between items-center text-white mt-4 shadow-xl">
@@ -485,7 +531,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
                       : dynamicStatus.get(row.base)?.captacaoReward}
                   </td>
                   <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.controlePerdas)}</td>
-                  <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.protagonismo)}</td>
+                  <td className="px-6 py-4 text-center font-manrope">
+                    {typeof dynamicStatus.get(row.base)?.protagonismoReward === 'number'
+                      ? formatCurrency(dynamicStatus.get(row.base)!.protagonismoReward as number)
+                      : dynamicStatus.get(row.base)?.protagonismoReward}
+                  </td>
                   <td className="px-6 py-4 text-right font-black text-deluna-primary font-manrope">{formatCurrency(row.total)}</td>
                 </tr>
               ))}

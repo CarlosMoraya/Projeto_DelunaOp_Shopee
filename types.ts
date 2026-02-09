@@ -109,6 +109,14 @@ export interface MetaCaptacaoData {
   valorPremio: number;
 }
 
+export interface MetaProtagonismoData {
+  base: string;
+  periodo: string;
+  tipoMeta: number;
+  valorMetaProtagonismo: number;
+  valorPremio: number;
+}
+
 export interface BaseListItem {
   base: string;
   coord: string;

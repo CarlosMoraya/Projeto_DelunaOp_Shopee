@@ -1,5 +1,5 @@
 
-import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData } from '../types';
+import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
@@ -9,6 +9,7 @@ const QLP_CACHE_KEY = 'qlp_data_cache_v2';
 const METAS_CACHE_KEY = 'metas_data_cache_v2';
 const METAS_DS_CACHE_KEY = 'metas_ds_data_cache_v1';
 const METAS_CAPTACAO_CACHE_KEY = 'metas_captacao_data_cache_v1';
+const METAS_PROTAGONISMO_CACHE_KEY = 'metas_protagonismo_data_cache_v1';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 // --- HELPER FUNCTIONS ---
@@ -27,8 +28,18 @@ export const getVal = (row: any, ...keys: string[]) => {
 export const parseNum = (val: any): number => {
     if (val === undefined || val === null || val === '') return NaN;
     if (typeof val === 'number') return val;
-    const clean = String(val).replace(',', '.').trim();
-    return parseFloat(clean);
+
+    // Remove caracteres não numéricos, exceto dítigos, vírgula, ponto e sinal de menos
+    let clean = String(val).replace(/[^\d.,-]/g, '').trim();
+
+    // Se houver vírgula, tratamos como formato brasileiro/europeu (vírgula decimal)
+    // Ex: "1.234,56" -> remove o ponto de milhar e troca vírgula por ponto
+    if (clean.includes(',')) {
+        clean = clean.replace(/\./g, '').replace(',', '.');
+    }
+
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : num;
 };
 // ------------------------
 
@@ -264,6 +275,40 @@ export const fetchMetasCaptacaoData = async (url: string = GOOGLE_SCRIPT_URL): P
         return processed;
     } catch (error) {
         console.error("Erro ao carregar Metas_Captacao:", error);
+        return [];
+    }
+};
+
+export const fetchMetaProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Promise<MetaProtagonismoData[]> => {
+    try {
+        const cached = localStorage.getItem(METAS_PROTAGONISMO_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                return data;
+            }
+        }
+
+        const response = await fetch(`${url}?tab=Metas_Protagonismo`);
+        if (!response.ok) throw new Error(`Erro na API Metas_Protagonismo: ${response.statusText}`);
+
+        const rawData: any[] = await response.json();
+        const processed = rawData.map(row => ({
+            base: String(getVal(row, 'BASES') || '').trim(),
+            periodo: String(getVal(row, 'PERIDO', 'PERÍODO', 'MES', 'MÊS', 'PERIODO') || '').trim(),
+            tipoMeta: Number(getVal(row, 'TIPO_META', 'Tipo_Meta') || 0),
+            valorMetaProtagonismo: parseNum(getVal(row, 'VALOR_META_PROTAGONISMO', 'Valor_Meta_Protagonismo') || 0),
+            valorPremio: parseNum(getVal(row, 'VALOR_PREMIO', 'Valor_Premio') || 0)
+        }));
+
+        localStorage.setItem(METAS_PROTAGONISMO_CACHE_KEY, JSON.stringify({
+            data: processed,
+            timestamp: Date.now()
+        }));
+
+        return processed;
+    } catch (error) {
+        console.error("Erro ao carregar Metas_Protagonismo:", error);
         return [];
     }
 };

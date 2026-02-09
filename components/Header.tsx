@@ -60,7 +60,7 @@ const Header: React.FC<HeaderProps> = ({
       case AppView.COMPARATIVO_ATS: return <>Comparativo de Volume ATs <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Período</span></>;
       case AppView.QLP_MANAGEMENT: return <>Gestão de QLP <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Base</span></>;
       case AppView.PROTAGONISMO: return <>Performance de Protagonismo <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Base</span></>;
-      case AppView.LEADERBOARD: return <>Campanha Acelera 30+ <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Base</span></>;
+      case AppView.LEADERBOARD: return <>Campanha Acelera + 30 <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Base</span></>;
     }
   };
 
