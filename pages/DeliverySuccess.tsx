@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell, ComposedChart, Line, Legend
+  Cell, ComposedChart, Line, Legend, LabelList
 } from 'recharts';
 import { fetchDeliveryData } from '../services/api';
 import { DeliveryData } from '../types';
@@ -16,30 +16,7 @@ const getColorByScore = (score: number) => {
   return '#74C69D';
 };
 
-const historyData = {
-  day: [
-    { label: '08:00', ats: 120, rate: 98.5 },
-    { label: '10:00', ats: 450, rate: 97.2 },
-    { label: '12:00', ats: 380, rate: 98.1 },
-    { label: '14:00', ats: 520, rate: 96.5 },
-    { label: '16:00', ats: 610, rate: 97.8 },
-    { label: '18:00', ats: 290, rate: 99.2 },
-  ],
-  week: [
-    { label: 'Seg', ats: 2100, rate: 98.2 },
-    { label: 'Ter', ats: 2450, rate: 97.5 },
-    { label: 'Qua', ats: 2200, rate: 98.8 },
-    { label: 'Qui', ats: 2800, rate: 96.4 },
-    { label: 'Sex', ats: 3100, rate: 97.1 },
-    { label: 'Sab', ats: 1500, rate: 99.0 },
-  ],
-  month: [
-    { label: 'Sem 1', ats: 12400, rate: 97.8 },
-    { label: 'Sem 2', ats: 14200, rate: 98.5 },
-    { label: 'Sem 3', ats: 13800, rate: 96.9 },
-    { label: 'Sem 4', ats: 15600, rate: 97.2 },
-  ]
-};
+
 
 const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ startDate, endDate }) => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -282,7 +259,20 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
 
   const dynamicCoordinatorData = useMemo(() => {
     const map = new Map<string, { totalAt: number, totalDelivered: number }>();
-    tableData.forEach(row => {
+
+    // Filtramos para o gráfico de Coordenadores: Período + Hub + Motorista (Exceto o próprio coordenador)
+    const start = new Date(startDate).getTime();
+    const end = new Date(endDate).getTime();
+
+    const filtered = tableData.filter(row => {
+      const rowDate = new Date(row.date).getTime();
+      const matchHub = !selectedHub || row.hub === selectedHub;
+      const matchDriver = !driverSearch || row.driver.toLowerCase().includes(driverSearch.toLowerCase());
+      const matchDate = (!startDate || rowDate >= start) && (!endDate || rowDate <= end);
+      return matchHub && matchDate && matchDriver;
+    });
+
+    filtered.forEach(row => {
       const coord = row.coordinator || 'S/C';
       const current = map.get(coord) || { totalAt: 0, totalDelivered: 0 };
       map.set(coord, {
@@ -301,12 +291,22 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
     });
 
     return result.sort((a, b) => b.score - a.score);
-  }, [tableData]);
+  }, [tableData, startDate, endDate, selectedHub, driverSearch]);
 
   const dynamicHubData = useMemo(() => {
     const map = new Map<string, { totalAt: number, totalDelivered: number }>();
-    // Hub chart é filtrado por COORDENADOR mas não por ele mesmo (para poder selecionar outro hub)
-    const hubFilterSource = tableData.filter(row => !selectedCoordinator || row.coordinator === selectedCoordinator);
+
+    // Hub chart é filtrado por COORDENADOR e PERÍODO (mas não por ele mesmo)
+    const start = new Date(startDate).getTime();
+    const end = new Date(endDate).getTime();
+
+    const hubFilterSource = tableData.filter(row => {
+      const rowDate = new Date(row.date).getTime();
+      const matchCoord = !selectedCoordinator || row.coordinator === selectedCoordinator;
+      const matchDriver = !driverSearch || row.driver.toLowerCase().includes(driverSearch.toLowerCase());
+      const matchDate = (!startDate || rowDate >= start) && (!endDate || rowDate <= end);
+      return matchCoord && matchDate && matchDriver;
+    });
 
     hubFilterSource.forEach(row => {
       const hub = row.hub || 'S/H';
@@ -329,7 +329,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
     return result.sort((a, b) => {
       return sortOrder === 'asc' ? a.value - b.value : b.value - a.value;
     });
-  }, [tableData, sortOrder, selectedCoordinator]);
+  }, [tableData, sortOrder, selectedCoordinator, startDate, endDate, driverSearch]);
 
   const toggleSort = () => {
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -398,7 +398,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={dynamicHubData}
-                margin={{ bottom: 20 }}
+                margin={{ top: 25, bottom: 20 }}
                 onClick={(data) => {
                   if (data && data.activeLabel) {
                     setSelectedHub(selectedHub === data.activeLabel ? null : data.activeLabel as string);
@@ -410,12 +410,12 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 8, fontWeight: 700, fill: '#64748B' }}
+                  tick={{ fontSize: 10, fontWeight: 700, fill: '#64748B' }}
                   interval={0}
                   angle={-45}
                   textAnchor="end"
                 />
-                <YAxis hide domain={[80, 100]} />
+                <YAxis hide domain={[80, 110]} />
                 <Tooltip
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '8px', border: 'none', fontSize: '12px' }}
@@ -428,6 +428,14 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
                       className="cursor-pointer"
                     />
                   ))}
+                  <LabelList
+                    dataKey="value"
+                    position="top"
+                    fill="#1B4332"
+                    fontSize={10}
+                    fontWeight={800}
+                    formatter={(val: number) => `${val}%`}
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
