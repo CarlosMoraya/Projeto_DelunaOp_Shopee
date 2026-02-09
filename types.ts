@@ -103,6 +103,12 @@ export interface MetaDSData {
   valorPremio: number;
 }
 
+export interface MetaCaptacaoData {
+  base: string;
+  valorMetaQLP: number;
+  valorPremio: number;
+}
+
 export interface BaseListItem {
   base: string;
   coord: string;

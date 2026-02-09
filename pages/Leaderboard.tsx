@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DeliveryData, MetaGoalData, MetaDSData } from '../types';
-import { fetchDeliveryData, fetchMetasData, fetchMetasDSData } from '../services/api';
+import { DeliveryData, MetaGoalData, MetaDSData, QLPData, MetaCaptacaoData } from '../types';
+import { fetchDeliveryData, fetchMetasData, fetchMetasDSData, fetchQLPData, fetchMetasCaptacaoData } from '../services/api';
 
 interface LeaderboardProps {
   startDate: string;
@@ -63,20 +63,26 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
   const [deliveryData, setDeliveryData] = useState<DeliveryData[]>([]);
   const [metasData, setMetasData] = useState<MetaGoalData[]>([]);
   const [metasDSData, setMetasDSData] = useState<MetaDSData[]>([]);
+  const [qlpData, setQlpData] = useState<QLPData[]>([]);
+  const [metasCaptacaoData, setMetasCaptacaoData] = useState<MetaCaptacaoData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [deliveryRes, metasRes, metasDSRes] = await Promise.all([
+        const [deliveryRes, metasRes, metasDSRes, qlpRes, metasCaptacaoRes] = await Promise.all([
           fetchDeliveryData(),
           fetchMetasData(),
-          fetchMetasDSData()
+          fetchMetasDSData(),
+          fetchQLPData(),
+          fetchMetasCaptacaoData()
         ]);
         setDeliveryData(deliveryRes);
         setMetasData(metasRes);
         setMetasDSData(metasDSRes);
+        setQlpData(qlpRes);
+        setMetasCaptacaoData(metasCaptacaoRes);
       } catch (err) {
         console.error('Erro ao carregar dados no Leaderboard:', err);
       } finally {
@@ -88,7 +94,12 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
 
   // Lógica de cálculo de performance (similar ao ComparativoATs)
   const dynamicStatus = useMemo(() => {
-    const statusMap = new Map<string, { isAccess: boolean; rewardValue: number | string; operationalReward: number | string }>();
+    const statusMap = new Map<string, {
+      isAccess: boolean;
+      rewardValue: number | string;
+      operationalReward: number | string;
+      captacaoReward: number | string;
+    }>();
 
     if (deliveryData.length === 0 || metasData.length === 0) return statusMap;
 
@@ -144,6 +155,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
 
       const dsRate = totalRemessas > 0 ? (totalDelivered / totalRemessas) * 100 : 0;
 
+      if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') { // Bases de exemplo do print
+        console.log(`DEBUG DS [${normalizedBase}]: DS_Calculado=${dsRate.toFixed(2)}% | Remessas=${totalRemessas} | Entregues=${totalDelivered}`);
+      }
+
       // Buscar metas de volume (Meta 1, 2, 3)
       const getMetaForType = (type: number) => metasData.find(m =>
         normalize(m.base) === normalizedBase &&
@@ -179,17 +194,49 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
         const mds2 = getMetaDS(2);
         const mds3 = getMetaDS(3);
 
+        if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') {
+          console.log(`DEBUG METAS [${normalizedBase}]: M1=${mds1?.valorMetaDS}% M2=${mds2?.valorMetaDS}% M3=${mds3?.valorMetaDS}%`);
+        }
+
+        // Comparação explícita
         if (mds3 && dsRate >= mds3.valorMetaDS) operationalReward = mds3.valorPremio;
         else if (mds2 && dsRate >= mds2.valorMetaDS) operationalReward = mds2.valorPremio;
         else if (mds1 && dsRate >= mds1.valorMetaDS) operationalReward = mds1.valorPremio;
-        else operationalReward = 0; // Ganha 0 se tiver acesso mas não atingir DS 1
+        else {
+          operationalReward = 0;
+          if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') console.log(`DEBUG RESULT [${normalizedBase}]: Meta não atingida.`);
+        }
       }
 
-      statusMap.set(row.base, { isAccess, rewardValue, operationalReward });
+      // NOVO: Regra de Negócio para Coluna Captação (Pilar 3)
+      let captacaoReward: number | string = '-';
+      if (isAccess) {
+        // Lógica de "Apto" do QLPManagement
+        const isApto = (status: string) => {
+          const s = String(status || '').toUpperCase().trim();
+          return s === 'APTO' || (s.includes('APTO') && !s.includes('INAPTO'));
+        };
+
+        const baseAptos = qlpData.filter(r =>
+          normalize(r.base) === normalizedBase &&
+          isApto(r.situacaoCnh) &&
+          isApto(r.situacaoMotorista) &&
+          isApto(r.situacaoGrPlaca)
+        ).length;
+
+        const metaCapt = metasCaptacaoData.find(m => normalize(m.base) === normalizedBase);
+        if (metaCapt && baseAptos >= metaCapt.valorMetaQLP) {
+          captacaoReward = metaCapt.valorPremio;
+        } else {
+          captacaoReward = 0;
+        }
+      }
+
+      statusMap.set(row.base, { isAccess, rewardValue, operationalReward, captacaoReward });
     });
 
     return statusMap;
-  }, [deliveryData, metasData, metasDSData, startDate, endDate]);
+  }, [deliveryData, metasData, metasDSData, qlpData, metasCaptacaoData, startDate, endDate]);
 
   // Cálculo de dados finais combinando campos estáticos com prêmios dinâmicos
   const finalLeaderboardData = useMemo(() => {
@@ -197,14 +244,16 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       const status = dynamicStatus.get(row.base);
       const dynamicReward = (status && typeof status.rewardValue === 'number') ? status.rewardValue : 0;
       const operReward = (status && typeof status.operationalReward === 'number') ? status.operationalReward : 0;
+      const captReward = (status && typeof status.captacaoReward === 'number') ? status.captacaoReward : 0;
 
-      // Novo total: Carr. dinâmico + Oper. dinâmico + outros pilares estáticos
-      const currentTotal = dynamicReward + operReward + row.esforcoCaptacao + row.controlePerdas + row.protagonismo;
+      // Novo total: Carr. dinâmico + Oper. dinâmico + Captação dinâmico + outros pilares estáticos
+      const currentTotal = dynamicReward + operReward + captReward + row.controlePerdas + row.protagonismo;
 
       return {
         ...row,
         carregamento: dynamicReward,
-        qOperacional: operReward, // Sobrescreve com o dinâmico de DS
+        qOperacional: operReward,
+        esforcoCaptacao: captReward, // Sobrescreve com o dinâmico do QLP
         total: currentTotal
       };
     }).sort((a, b) => b.total - a.total);
@@ -325,7 +374,13 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
                       : dynamicStatus.get(leader.base)?.operationalReward as string}
                     sub="Pilar 2"
                   />
-                  <ValueCard label="Captação" value={formatCurrency(leader.esforcoCaptacao)} sub="Pilar 3" />
+                  <ValueCard
+                    label="Captação"
+                    value={typeof dynamicStatus.get(leader.base)?.captacaoReward === 'number'
+                      ? formatCurrency(dynamicStatus.get(leader.base)!.captacaoReward as number)
+                      : dynamicStatus.get(leader.base)?.captacaoReward as string}
+                    sub="Pilar 3"
+                  />
                   <ValueCard label="Perdas" value={formatCurrency(leader.controlePerdas)} sub="Pilar 4" />
                   <ValueCard label="Protagonismo" value={formatCurrency(leader.protagonismo)} sub="Pilar 5" />
                 </div>
@@ -424,7 +479,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
                       ? formatCurrency(dynamicStatus.get(row.base)!.operationalReward as number)
                       : dynamicStatus.get(row.base)?.operationalReward}
                   </td>
-                  <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.esforcoCaptacao)}</td>
+                  <td className="px-6 py-4 text-center font-manrope">
+                    {typeof dynamicStatus.get(row.base)?.captacaoReward === 'number'
+                      ? formatCurrency(dynamicStatus.get(row.base)!.captacaoReward as number)
+                      : dynamicStatus.get(row.base)?.captacaoReward}
+                  </td>
                   <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.controlePerdas)}</td>
                   <td className="px-6 py-4 text-center font-manrope">{formatCurrency(row.protagonismo)}</td>
                   <td className="px-6 py-4 text-right font-black text-deluna-primary font-manrope">{formatCurrency(row.total)}</td>

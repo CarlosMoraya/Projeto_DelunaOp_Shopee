@@ -1,5 +1,5 @@
 
-import { DeliveryData, QLPData, MetaGoalData, MetaDSData } from '../types';
+import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
@@ -8,6 +8,7 @@ const CACHE_KEY = 'delivery_data_cache_v5';
 const QLP_CACHE_KEY = 'qlp_data_cache_v2';
 const METAS_CACHE_KEY = 'metas_data_cache_v2';
 const METAS_DS_CACHE_KEY = 'metas_ds_data_cache_v1';
+const METAS_CAPTACAO_CACHE_KEY = 'metas_captacao_data_cache_v1';
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 // --- HELPER FUNCTIONS ---
@@ -210,12 +211,18 @@ export const fetchMetasDSData = async (url: string = GOOGLE_SCRIPT_URL): Promise
         if (!response.ok) throw new Error(`Erro na API Metas_DS: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
-        const processed = rawData.map(row => ({
-            base: String(getVal(row, 'BASES') || '').trim(),
-            tipoMeta: Number(getVal(row, 'TIPO_META', 'Tipo_Meta') || 0),
-            valorMetaDS: parseNum(getVal(row, 'VALOR_META_DS', 'Valor_Meta_DS') || 0),
-            valorPremio: parseNum(getVal(row, 'VALOR_PREMIO', 'Valor_Premio') || 0)
-        }));
+        const processed = rawData.map(row => {
+            let metaVal = parseNum(getVal(row, 'VALOR_META_DS', 'Valor_Meta_DS') || 0);
+            // Se a meta vier como decimal (ex: 0.99 para 99%), normaliza para escala 0-100
+            if (metaVal > 0 && metaVal <= 1) metaVal *= 100;
+
+            return {
+                base: String(getVal(row, 'BASES') || '').trim(),
+                tipoMeta: Number(getVal(row, 'TIPO_META', 'Tipo_Meta') || 0),
+                valorMetaDS: metaVal,
+                valorPremio: parseNum(getVal(row, 'VALOR_PREMIO', 'Valor_Premio') || 0)
+            };
+        });
 
         localStorage.setItem(METAS_DS_CACHE_KEY, JSON.stringify({
             data: processed,
@@ -225,6 +232,38 @@ export const fetchMetasDSData = async (url: string = GOOGLE_SCRIPT_URL): Promise
         return processed;
     } catch (error) {
         console.error("Erro ao carregar Metas_DS:", error);
+        return [];
+    }
+};
+
+export const fetchMetasCaptacaoData = async (url: string = GOOGLE_SCRIPT_URL): Promise<MetaCaptacaoData[]> => {
+    try {
+        const cached = localStorage.getItem(METAS_CAPTACAO_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                return data;
+            }
+        }
+
+        const response = await fetch(`${url}?tab=Metas_Captacao`);
+        if (!response.ok) throw new Error(`Erro na API Metas_Captacao: ${response.statusText}`);
+
+        const rawData: any[] = await response.json();
+        const processed = rawData.map(row => ({
+            base: String(getVal(row, 'BASES') || '').trim(),
+            valorMetaQLP: parseNum(getVal(row, 'VALOR_META_QLP', 'Valor_Meta_QLP') || 0),
+            valorPremio: parseNum(getVal(row, 'VALOR_PREMIO', 'Valor_Premio') || 0)
+        }));
+
+        localStorage.setItem(METAS_CAPTACAO_CACHE_KEY, JSON.stringify({
+            data: processed,
+            timestamp: Date.now()
+        }));
+
+        return processed;
+    } catch (error) {
+        console.error("Erro ao carregar Metas_Captacao:", error);
         return [];
     }
 };
