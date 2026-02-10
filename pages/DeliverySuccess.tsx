@@ -179,7 +179,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
 
   // Histograma dinâmico baseado no filtro de visualização (Dia, Semana, Mês)
   const dynamicHistoryData = useMemo(() => {
-    const grouped = new Map<string, { ats: number, delivered: number, sortKey: string, dateObj: Date }>();
+    const grouped = new Map<string, { totalAtQuantity: number, delivered: number, atCodes: Set<string>, sortKey: string, dateObj: Date }>();
 
     filteredTableData.forEach(row => {
       const date = new Date(row.date);
@@ -213,10 +213,23 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
         sortKey = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
       }
 
-      const current = grouped.get(groupKey) || { ats: 0, delivered: 0, sortKey, dateObj: date };
+      const current = grouped.get(groupKey) || {
+        totalAtQuantity: 0,
+        delivered: 0,
+        atCodes: new Set<string>(),
+        sortKey,
+        dateObj: date
+      };
+
+      if (row.atCode) {
+        current.atCodes.add(row.atCode);
+      } else {
+        current.atCodes.add(`row-${row.id}`);
+      }
+
       grouped.set(groupKey, {
         ...current,
-        ats: current.ats + row.atQuantity,
+        totalAtQuantity: current.totalAtQuantity + row.atQuantity,
         delivered: current.delivered + row.delivered
       });
     });
@@ -243,8 +256,8 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
 
       return {
         label: displayLabel,
-        ats: stats.ats,
-        rate: stats.ats > 0 ? Math.round((stats.delivered / stats.ats) * 1000) / 10 : 0,
+        totalATs: stats.atCodes.size,
+        rate: stats.totalAtQuantity > 0 ? Math.round((stats.delivered / stats.totalAtQuantity) * 1000) / 10 : 0,
         sortKey: stats.sortKey
       };
     }).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
@@ -448,7 +461,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
             <h3 className="text-deluna-primary text-base md:text-lg font-bold">Produtividade & Qualidade</h3>
-            <p className="text-xs md:text-sm text-[#64748B]">Volume vs Qualidade</p>
+            <p className="text-xs md:text-sm text-[#64748B]">Rotas vs Qualidade</p>
           </div>
           <div className="flex bg-[#F1F5F9] p-1 rounded-lg w-full sm:w-auto overflow-x-auto">
             {(['day', 'week', 'month'] as const).map((range) => (
@@ -494,8 +507,8 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
               <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '10px' }} />
               <Bar
                 yAxisId="left"
-                dataKey="ats"
-                name="Volume"
+                dataKey="totalATs"
+                name="Total de ATS"
                 fill="#1B4332"
                 radius={[4, 4, 0, 0]}
                 barSize={window.innerWidth < 768 ? 20 : 40}
