@@ -481,7 +481,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
 
         <div className="h-64 md:h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={dynamicHistoryData} margin={{ top: 20, right: 0, bottom: 20, left: 0 }}>
+            <ComposedChart data={dynamicHistoryData} margin={{ top: 40, right: 0, bottom: 20, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis
                 dataKey="label"
@@ -512,7 +512,16 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
                 fill="#1B4332"
                 radius={[4, 4, 0, 0]}
                 barSize={window.innerWidth < 768 ? 20 : 40}
-              />
+              >
+                <LabelList
+                  dataKey="totalATs"
+                  position="top"
+                  offset={15}
+                  fill="#1B4332"
+                  fontSize={9}
+                  fontWeight={800}
+                />
+              </Bar>
               <Line
                 yAxisId="right"
                 type="monotone"
@@ -521,7 +530,17 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
                 stroke="#2c7a7b"
                 strokeWidth={2.5}
                 dot={{ r: 3, fill: '#2c7a7b' }}
-              />
+              >
+                <LabelList
+                  dataKey="rate"
+                  position="top"
+                  offset={5}
+                  fill="#2c7a7b"
+                  fontSize={9}
+                  fontWeight={800}
+                  formatter={(val: number) => `${val}%`}
+                />
+              </Line>
             </ComposedChart>
           </ResponsiveContainer>
         </div>

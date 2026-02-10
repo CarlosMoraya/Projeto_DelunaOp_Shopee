@@ -5,7 +5,8 @@ export enum AppView {
   PROTAGONISMO = 'protagonismo',
   LEADERBOARD = 'leaderboard',
   COMPARATIVO = 'comparativo',
-  COMPARATIVO_ATS = 'comparativo_ats'
+  COMPARATIVO_ATS = 'comparativo_ats',
+  PNR_STUCK = 'pnr_stuck'
 }
 
 export interface MetricCardProps {

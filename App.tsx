@@ -9,6 +9,7 @@ import Protagonismo from './pages/Protagonismo';
 import Leaderboard from './pages/Leaderboard';
 import Comparativo from './pages/Comparativo';
 import ComparativoATs from './pages/ComparativoATs';
+import PNRStuck from './pages/PNRStuck';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DELIVERY_SUCCESS);
@@ -39,6 +40,8 @@ const App: React.FC = () => {
         return <Protagonismo />;
       case AppView.LEADERBOARD:
         return <Leaderboard startDate={startDate} endDate={endDate} />;
+      case AppView.PNR_STUCK:
+        return <PNRStuck startDate={startDate} endDate={endDate} />;
       default:
         return <DeliverySuccess />;
     }
