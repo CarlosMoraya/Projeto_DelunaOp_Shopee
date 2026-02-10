@@ -10,7 +10,20 @@ const METAS_CACHE_KEY = 'metas_data_cache_v2';
 const METAS_DS_CACHE_KEY = 'metas_ds_data_cache_v1';
 const METAS_CAPTACAO_CACHE_KEY = 'metas_captacao_data_cache_v1';
 const METAS_PROTAGONISMO_CACHE_KEY = 'metas_protagonismo_data_cache_v1';
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 horas
+
+/**
+ * Limpa todos os caches locais do sistema para forçar uma nova busca no Google Sheets.
+ */
+export const clearApiCache = () => {
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(QLP_CACHE_KEY);
+    localStorage.removeItem(METAS_CACHE_KEY);
+    localStorage.removeItem(METAS_DS_CACHE_KEY);
+    localStorage.removeItem(METAS_CAPTACAO_CACHE_KEY);
+    localStorage.removeItem(METAS_PROTAGONISMO_CACHE_KEY);
+    console.log("Caches limpos com sucesso!");
+};
 
 // --- HELPER FUNCTIONS ---
 export const getVal = (row: any, ...keys: string[]) => {

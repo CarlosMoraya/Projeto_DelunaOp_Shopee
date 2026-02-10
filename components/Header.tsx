@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { AppView } from '../types';
+import { clearApiCache } from '../services/api';
 
 interface HeaderProps {
   currentView: AppView;
@@ -26,6 +27,16 @@ const Header: React.FC<HeaderProps> = ({
   setEndDate
 }) => {
   const [imgError, setImgError] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    clearApiCache();
+    // Pequeno delay para efeito visual do ícone girando
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  };
 
   // Função para converter links de visualização do Drive em links diretos de imagem
   const getOptimizedImageUrl = (url: string) => {
@@ -128,6 +139,19 @@ const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
         <div className="hidden sm:block h-8 w-[1px] bg-slate-200 mx-2"></div>
+
+        {/* Botão de Refresh Manual */}
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          title="Atualizar dados da planilha"
+          className={`flex items-center justify-center rounded-lg h-9 w-9 md:h-10 md:w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-[#F8FAFC] transition-all ${isRefreshing ? 'opacity-50' : ''}`}
+        >
+          <span className={`material-symbols-outlined text-[18px] md:text-[20px] ${isRefreshing ? 'animate-spin' : ''}`}>
+            sync
+          </span>
+        </button>
+
         <button className="flex items-center justify-center rounded-lg h-9 w-9 md:h-10 md:w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-[#F8FAFC]">
           <span className="material-symbols-outlined text-[18px] md:text-[20px]">notifications</span>
         </button>
