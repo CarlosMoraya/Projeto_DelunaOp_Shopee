@@ -18,7 +18,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onCl
     { id: AppView.COMPARATIVO_ATS, icon: 'bar_chart', label: 'Comparativo ATs' },
     { id: AppView.QLP_MANAGEMENT, icon: 'analytics', label: 'QLP Atual' },
     { id: AppView.PROTAGONISMO, icon: 'military_tech', label: 'Protagonismo' },
-    { id: AppView.PNR_STUCK, icon: 'error_outline', label: 'PNR & Stuck' },
+    { id: AppView.PNR_STUCK, icon: 'error_outline', label: 'Gestão PNR' },
     { id: AppView.LEADERBOARD, icon: 'format_list_numbered', label: 'Campanha Acelera +30' },
   ];
 

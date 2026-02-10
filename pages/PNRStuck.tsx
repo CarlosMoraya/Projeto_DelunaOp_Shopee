@@ -3,24 +3,30 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     Cell, PieChart, Pie, Legend, LabelList
 } from 'recharts';
-import { fetchDeliveryData } from '../services/api';
-import { DeliveryData } from '../types';
+import { fetchDeliveryData, fetchPNRData } from '../services/api';
+import { DeliveryData, PNROperationalDetail, PNRRow } from '../types';
 
 const ITEMS_PER_PAGE = 20;
 
 const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate, endDate }) => {
     const [tableData, setTableData] = useState<DeliveryData[]>([]);
+    const [pnrData, setPnrData] = useState<PNRRow[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedHub, setSelectedHub] = useState<string | null>(null);
+    const [driverSearch, setDriverSearch] = useState('');
 
     useEffect(() => {
         const loadData = async () => {
             try {
                 setLoading(true);
-                const data = await fetchDeliveryData();
-                setTableData(data);
+                const [delivery, pnr] = await Promise.all([
+                    fetchDeliveryData(),
+                    fetchPNRData()
+                ]);
+                setTableData(delivery);
+                setPnrData(pnr);
                 setError(null);
             } catch (err) {
                 setError('Erro ao carregar dados para PNR & Stuck.');
@@ -32,41 +38,73 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
         loadData();
     }, []);
 
-    const filteredData = useMemo(() => {
-        const start = new Date(startDate).getTime();
-        const end = new Date(endDate).getTime();
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [startDate, endDate, selectedHub, driverSearch]);
+
+    const filteredPnr = useMemo(() => {
+        const start = startDate ? new Date(startDate + 'T00:00:00').getTime() : 0;
+        const end = endDate ? new Date(endDate + 'T23:59:59').getTime() : Infinity;
+        const hubNorm = selectedHub?.trim().toUpperCase();
+
+        return pnrData.filter(row => {
+            if (!row.date) return false;
+            const rowDate = new Date(row.date + 'T00:00:00').getTime();
+            const matchDate = rowDate >= start && rowDate <= end;
+            const matchHub = !hubNorm || row.base.trim().toUpperCase() === hubNorm;
+            return matchDate && matchHub;
+        });
+    }, [pnrData, startDate, endDate, selectedHub]);
+
+    const filteredDelivery = useMemo(() => {
+        const start = startDate ? new Date(startDate + 'T00:00:00').getTime() : 0;
+        const end = endDate ? new Date(endDate + 'T23:59:59').getTime() : Infinity;
+        const hubNorm = selectedHub?.trim().toUpperCase();
+
         return tableData.filter(row => {
-            const rowDate = new Date(row.date).getTime();
-            const matchDate = (!startDate || rowDate >= start) && (!endDate || rowDate <= end);
-            const matchHub = !selectedHub || row.hub === selectedHub;
+            if (!row.date) return false;
+            const rowDate = new Date(row.date + 'T00:00:00').getTime();
+            const matchDate = rowDate >= start && rowDate <= end;
+            const matchHub = !hubNorm || row.hub.trim().toUpperCase() === hubNorm;
             return matchDate && matchHub;
         });
     }, [tableData, startDate, endDate, selectedHub]);
 
     const stats = useMemo(() => {
-        const totalPending = filteredData.reduce((acc, row) => acc + row.pending, 0);
-        const totalShipments = filteredData.reduce((acc, row) => acc + row.atQuantity, 0);
-        const totalFailures = filteredData.reduce((acc, row) => acc + row.failures, 0);
+        const totalPending = filteredDelivery.reduce((acc, row) => acc + row.pending, 0);
+        const totalShipments = filteredDelivery.reduce((acc, row) => acc + row.atQuantity, 0);
+        const totalFailures = filteredPnr.length;
+        const totalReverted = filteredPnr.filter(row => row.statusShopee.toUpperCase() === 'REVERTIDO').length;
 
         const pnrRate = totalShipments > 0 ? (totalFailures / totalShipments) * 100 : 0;
-        const stuckRate = totalShipments > 0 ? (totalPending / totalShipments) * 100 : 0;
 
         return {
             totalPending,
             totalShipments,
             totalFailures,
-            pnrRate,
-            stuckRate
+            totalReverted,
+            pnrRate
         };
-    }, [filteredData]);
+    }, [filteredDelivery, filteredPnr]);
 
     const hubData = useMemo(() => {
         const map = new Map<string, { pending: number, failures: number }>();
-        filteredData.forEach(row => {
-            const current = map.get(row.hub) || { pending: 0, failures: 0 };
-            map.set(row.hub, {
+
+        filteredDelivery.forEach(row => {
+            const h = row.hub.trim().toUpperCase();
+            const current = map.get(h) || { pending: 0, failures: 0 };
+            map.set(h, {
                 pending: current.pending + row.pending,
-                failures: current.failures + row.failures
+                failures: current.failures
+            });
+        });
+
+        filteredPnr.forEach(row => {
+            const b = row.base.trim().toUpperCase();
+            const current = map.get(b) || { pending: 0, failures: 0 };
+            map.set(b, {
+                pending: current.pending,
+                failures: current.failures + 1
             });
         });
 
@@ -74,15 +112,73 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
             .map(([name, data]) => ({ name, ...data }))
             .sort((a, b) => b.pending - a.pending)
             .slice(0, 10);
-    }, [filteredData]);
+    }, [filteredDelivery, filteredPnr]);
+
+    const operationalDetails = useMemo(() => {
+        // Agrupar PNRs por Motorista e Base (Normalizado para Join)
+        const pnrGroups = new Map<string, { count: number, originalDriver: string, originalBase: string }>();
+        filteredPnr.forEach(row => {
+            const driverNorm = row.driver.trim().toUpperCase();
+            const baseNorm = row.base.trim().toUpperCase();
+            const key = `${driverNorm}|${baseNorm}`;
+
+            const current = pnrGroups.get(key) || { count: 0, originalDriver: row.driver, originalBase: row.base };
+            pnrGroups.set(key, {
+                ...current,
+                count: current.count + 1
+            });
+        });
+
+        // Agrupar Entregas por Motorista e Base
+        const deliveryGroups = new Map<string, number>();
+        filteredDelivery.forEach(row => {
+            const driverNorm = row.driver.trim().toUpperCase();
+            const baseNorm = row.hub.trim().toUpperCase();
+            const key = `${driverNorm}|${baseNorm}`;
+            deliveryGroups.set(key, (deliveryGroups.get(key) || 0) + row.atQuantity);
+        });
+
+        // Combinar os dados de forma única por Motorista e Base
+        const allKeys = new Set([...pnrGroups.keys(), ...deliveryGroups.keys()]);
+
+        const details: PNROperationalDetail[] = Array.from(allKeys).map(key => {
+            const [driverNorm, baseNorm] = key.split('|');
+
+            const pnrEntry = pnrGroups.get(key);
+            const pnrCount = pnrEntry?.count || 0;
+            const totalPackets = deliveryGroups.get(key) || 0;
+            const pnrPercentage = totalPackets > 0 ? (pnrCount / totalPackets) * 100 : 0;
+
+            // Para exibição, preferimos o nome original
+            const displayDriver = pnrEntry?.originalDriver || driverNorm;
+            const displayBase = pnrEntry?.originalBase || baseNorm;
+
+            return {
+                driver: displayDriver,
+                base: displayBase,
+                pnrCount,
+                totalPackets,
+                pnrPercentage
+            };
+        });
+
+        // Aplicar busca por motorista
+        const searchFiltered = driverSearch
+            ? details.filter(d => d.driver.toLowerCase().includes(driverSearch.toLowerCase()))
+            : details;
+
+        return searchFiltered.sort((a, b) => b.pnrCount - a.pnrCount);
+    }, [filteredPnr, filteredDelivery, driverSearch]);
+
+
+
 
     const paginatedTable = useMemo(() => {
-        const sorted = [...filteredData].sort((a, b) => b.pending - a.pending);
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
-        return sorted.slice(start, start + ITEMS_PER_PAGE);
-    }, [filteredData, currentPage]);
+        return operationalDetails.slice(start, start + ITEMS_PER_PAGE);
+    }, [operationalDetails, currentPage]);
 
-    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(operationalDetails.length / ITEMS_PER_PAGE);
 
     return (
         <div className="p-4 md:p-10 flex flex-col gap-6 md:gap-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -102,20 +198,12 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
             {/* Metric Cards */}
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                 <MetricCard
-                    label="Total Pendentes (Stuck)"
-                    value={stats.totalPending.toLocaleString('pt-BR')}
-                    icon="pause_circle"
-                    gradient="from-orange-50 to-white"
-                    borderColor="border-orange-100"
-                    iconBg="bg-orange-500"
-                />
-                <MetricCard
-                    label="Taxa de Stuck"
-                    value={stats.stuckRate.toFixed(2) + '%'}
-                    icon="hourglass_empty"
-                    gradient="from-yellow-50 to-white"
-                    borderColor="border-yellow-100"
-                    iconBg="bg-yellow-500"
+                    label="Total Pacotes"
+                    value={stats.totalShipments.toLocaleString('pt-BR')}
+                    icon="package_2"
+                    gradient="from-blue-50 to-white"
+                    borderColor="border-blue-100"
+                    iconBg="bg-blue-500"
                 />
                 <MetricCard
                     label="Insucessos (PNR)"
@@ -132,6 +220,14 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                     gradient="from-rose-50 to-white"
                     borderColor="border-rose-100"
                     iconBg="bg-rose-500"
+                />
+                <MetricCard
+                    label="Revertidos"
+                    value={stats.totalReverted.toLocaleString('pt-BR')}
+                    icon="cached"
+                    gradient="from-green-50 to-white"
+                    borderColor="border-green-100"
+                    iconBg="bg-green-500"
                 />
             </section>
 
@@ -223,45 +319,50 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                         <h3 className="text-lg font-black text-deluna-primary uppercase tracking-tight">Detalhamento Operacional</h3>
                         <p className="text-xs font-medium text-[#64748B]">Granularidade por motorista e hub</p>
                     </div>
-                    <div className="flex gap-2">
-                        <button className="px-4 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs font-bold text-deluna-primary hover:bg-[#F1F5F9] transition-all flex items-center gap-2">
-                            <span className="material-symbols-outlined text-sm">filter_alt</span>
-                            Filtrar Pendências
-                        </button>
-                        <button className="px-4 py-2 bg-deluna-primary text-white rounded-xl text-xs font-bold hover:bg-deluna-primary-light transition-all flex items-center gap-2">
-                            <span className="material-symbols-outlined text-sm">download</span>
-                            Exportar
-                        </button>
+                    <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-center">
+                        <div className="relative w-full sm:w-64">
+                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+                            <input
+                                type="text"
+                                placeholder="Buscar motorista..."
+                                value={driverSearch}
+                                onChange={(e) => setDriverSearch(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs font-medium text-deluna-primary placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-deluna-primary/20 transition-all shadow-sm"
+                            />
+                        </div>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                            <button className="px-4 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-xs font-bold text-deluna-primary hover:bg-[#F1F5F9] transition-all flex items-center gap-2">
+                                <span className="material-symbols-outlined text-sm">filter_alt</span>
+                                Filtros
+                            </button>
+                            <button className="px-4 py-2 bg-deluna-primary text-white rounded-xl text-xs font-bold hover:bg-deluna-primary-light transition-all flex items-center gap-2">
+                                <span className="material-symbols-outlined text-sm">download</span>
+                                Exportar
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left min-w-[1000px]">
                         <thead className="bg-[#F8FAFC]">
                             <tr className="text-[#64748B] text-[10px] font-black uppercase tracking-widest">
-                                <th className="px-8 py-5">Data Operação</th>
-                                <th className="px-8 py-5">Base / Hub</th>
                                 <th className="px-8 py-5">Motorista Responsável</th>
-                                <th className="px-8 py-5 text-right">Volume ATs</th>
-                                <th className="px-8 py-5 text-right">Pendentes (Stuck)</th>
-                                <th className="px-8 py-5 text-right">Insucessos (PNR)</th>
+                                <th className="px-8 py-5">Base / Hub</th>
+                                <th className="px-8 py-5 text-right">Pacotes (PNR)</th>
+                                <th className="px-8 py-5 text-right">Total Pacotes</th>
+                                <th className="px-8 py-5 text-right">PNR %</th>
+                                <th className="px-8 py-5 text-center">Meta</th>
+                                <th className="px-8 py-5 text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F1F5F9]">
                             {loading ? (
-                                <tr><td colSpan={6} className="px-8 py-20 text-center text-slate-400 font-bold animate-pulse">Carregando indicadores logísticos...</td></tr>
+                                <tr><td colSpan={7} className="px-8 py-20 text-center text-slate-400 font-bold animate-pulse">Carregando indicadores logísticos...</td></tr>
                             ) : paginatedTable.length === 0 ? (
-                                <tr><td colSpan={6} className="px-8 py-20 text-center text-slate-400 font-bold">Nenhum registro encontrado para o período.</td></tr>
+                                <tr><td colSpan={7} className="px-8 py-20 text-center text-slate-400 font-bold">Nenhum registro encontrado para o período.</td></tr>
                             ) : (
                                 paginatedTable.map((row, i) => (
                                     <tr key={i} className="hover:bg-slate-50/80 transition-all group">
-                                        <td className="px-8 py-5 text-sm font-semibold text-slate-500">
-                                            {new Date(row.date).toLocaleDateString('pt-BR')}
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <span className="px-3 py-1 bg-deluna-primary/5 text-deluna-primary rounded-full text-[11px] font-bold border border-deluna-primary/10">
-                                                {row.hub}
-                                            </span>
-                                        </td>
                                         <td className="px-8 py-5">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-deluna-primary text-white flex items-center justify-center text-[10px] font-black">
@@ -270,14 +371,39 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                                                 <span className="text-sm font-extrabold text-deluna-primary group-hover:translate-x-1 transition-transform">{row.driver}</span>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-5 text-sm text-right font-black text-slate-400">{row.atQuantity}</td>
-                                        <td className="px-8 py-5 text-sm text-right font-black text-orange-600">
-                                            <div className="flex items-center justify-end gap-2">
-                                                {row.pending}
-                                                {row.pending > 5 && <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping"></span>}
-                                            </div>
+                                        <td className="px-8 py-5">
+                                            <span className="px-3 py-1 bg-deluna-primary/5 text-deluna-primary rounded-full text-[11px] font-bold border border-deluna-primary/10">
+                                                {row.base}
+                                            </span>
                                         </td>
-                                        <td className="px-8 py-5 text-sm text-right font-black text-red-600">{row.failures}</td>
+                                        <td className="px-8 py-5 text-sm text-right font-black text-red-600">
+                                            {row.pnrCount}
+                                        </td>
+                                        <td className="px-8 py-5 text-sm text-right font-black text-slate-400">
+                                            {row.totalPackets}
+                                        </td>
+                                        <td className="px-8 py-5 text-sm text-right">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${row.pnrPercentage > 1.00 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                                                }`}>
+                                                {row.pnrPercentage.toFixed(2)}%
+                                            </span>
+                                        </td>
+                                        <td className="px-8 py-5 text-center text-[11px] font-bold text-slate-500">
+                                            1.00%
+                                        </td>
+                                        <td className="px-8 py-5 text-center">
+                                            {row.pnrPercentage <= 1.00 ? (
+                                                <div className="flex items-center justify-center gap-1.5 text-green-600">
+                                                    <span className="material-symbols-outlined text-base">check_circle</span>
+                                                    <span className="text-[10px] font-black uppercase tracking-tight">Alcançada</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-center gap-1.5 text-red-600">
+                                                    <span className="material-symbols-outlined text-base">error_outline</span>
+                                                    <span className="text-[10px] font-black uppercase tracking-tight">Fora da Meta</span>
+                                                </div>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))
                             )}
@@ -287,7 +413,7 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
 
                 <div className="px-8 py-5 bg-[#F8FAFC] border-t border-[#F1F5F9] flex flex-col sm:flex-row justify-between items-center gap-4">
                     <p className="text-xs font-bold text-[#64748B]">
-                        Exibindo {Math.min(paginatedTable.length, ITEMS_PER_PAGE)} de {filteredData.length} registros operacionais
+                        Exibindo {Math.min(paginatedTable.length, ITEMS_PER_PAGE)} de {operationalDetails.length} registros operacionais
                     </p>
                     <div className="flex gap-2">
                         <button

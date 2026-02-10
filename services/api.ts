@@ -1,5 +1,5 @@
 
-import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow } from '../types';
+import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
@@ -11,6 +11,7 @@ const METAS_DS_CACHE_KEY = 'metas_ds_data_cache_v1';
 const METAS_CAPTACAO_CACHE_KEY = 'metas_captacao_data_cache_v1';
 const METAS_PROTAGONISMO_CACHE_KEY = 'metas_protagonismo_data_cache_v1';
 const ACESSOS_CACHE_KEY = 'acessos_data_cache_v1';
+const PNR_CACHE_KEY = 'pnr_data_cache_v4';
 const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 horas
 
 /**
@@ -24,6 +25,7 @@ export const clearApiCache = () => {
     localStorage.removeItem(METAS_CAPTACAO_CACHE_KEY);
     localStorage.removeItem(METAS_PROTAGONISMO_CACHE_KEY);
     localStorage.removeItem(ACESSOS_CACHE_KEY);
+    localStorage.removeItem(PNR_CACHE_KEY);
     console.log("Caches limpos com sucesso!");
 };
 
@@ -479,6 +481,89 @@ export const fetchAllowedEmails = async (url: string = GOOGLE_SCRIPT_URL): Promi
         return emails;
     } catch (error) {
         console.error("Erro ao carregar lista de acessos:", error);
+        return [];
+    }
+};
+
+export const fetchPNRData = async (url: string = GOOGLE_SCRIPT_URL): Promise<PNRRow[]> => {
+    try {
+        const cached = localStorage.getItem(PNR_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                return data;
+            }
+        }
+
+        const response = await fetch(`${url}?tab=Base_PNR`);
+        if (!response.ok) {
+            throw new Error(`Erro na API PNR: ${response.statusText}`);
+        }
+
+        const rawData: any[] = await response.json();
+
+        if (!Array.isArray(rawData)) {
+            console.error("Formato de resposta PNR inválido", rawData);
+            return [];
+        }
+
+        const processedData = rawData
+            .filter(row => {
+                const driver = getVal(row, 'Motorista', 'DRIVER', 'Nome do motorista');
+                const tracking = getVal(row, 'SPX Tracking Number', 'TRACKING', 'ID', 'Tracking');
+                return driver && tracking;
+            })
+            .map((row, index) => {
+                // Prioridade absoluta para DATA DA ROTA
+                let rawDate = String(getVal(row, 'DATA DA ROTA') || getVal(row, 'DATA') || getVal(row, 'Date') || '');
+                let formattedDate = '';
+
+                if (rawDate.includes('T')) {
+                    formattedDate = rawDate.split('T')[0];
+                } else if (rawDate.includes('/')) {
+                    const parts = rawDate.split('/');
+                    if (parts.length === 3) {
+                        let [d, m, y] = parts;
+                        if (y.length === 2) y = '20' + y;
+                        formattedDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                    } else if (parts.length === 2) {
+                        // Caso venha apenas DD/MM, assume o ano atual
+                        const [d, m] = parts;
+                        const y = new Date().getFullYear();
+                        formattedDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                    } else {
+                        formattedDate = rawDate;
+                    }
+                } else {
+                    formattedDate = rawDate;
+                }
+
+                if (index === 0) {
+                    console.log("PNR Data Sample:", {
+                        raw: rawDate,
+                        formatted: formattedDate,
+                        keys: Object.keys(row)
+                    });
+                }
+
+                return {
+                    date: formattedDate,
+                    driver: String(getVal(row, 'Motorista', 'DRIVER', 'Nome do motorista') || '').trim(),
+                    base: String(getVal(row, 'Base', 'BASES', 'HUB') || '').trim(),
+                    trackingNumber: String(getVal(row, 'SPX Tracking Number', 'TRACKING', 'ID') || '').trim(),
+                    statusShopee: String(getVal(row, 'Status Shopee', 'STATUS') || '').trim()
+                };
+            });
+
+        localStorage.setItem(PNR_CACHE_KEY, JSON.stringify({
+            data: processedData,
+            timestamp: Date.now()
+        }));
+
+        return processedData;
+
+    } catch (error) {
+        console.error("Falha ao buscar dados de PNR:", error);
         return [];
     }
 };

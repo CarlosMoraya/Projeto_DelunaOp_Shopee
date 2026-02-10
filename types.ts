@@ -134,3 +134,19 @@ export interface ProtagonismoNote {
 export interface ProtagonismoRow extends BaseListItem {
   resultado: number;
 }
+
+export interface PNRRow {
+  date: string;
+  driver: string;
+  base: string;
+  trackingNumber: string;
+  statusShopee: string;
+}
+
+export interface PNROperationalDetail {
+  driver: string;
+  base: string;
+  pnrCount: number;
+  totalPackets: number;
+  pnrPercentage: number;
+}
