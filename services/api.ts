@@ -10,6 +10,7 @@ const METAS_CACHE_KEY = 'metas_data_cache_v2';
 const METAS_DS_CACHE_KEY = 'metas_ds_data_cache_v1';
 const METAS_CAPTACAO_CACHE_KEY = 'metas_captacao_data_cache_v1';
 const METAS_PROTAGONISMO_CACHE_KEY = 'metas_protagonismo_data_cache_v1';
+const ACESSOS_CACHE_KEY = 'acessos_data_cache_v1';
 const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 horas
 
 /**
@@ -22,6 +23,7 @@ export const clearApiCache = () => {
     localStorage.removeItem(METAS_DS_CACHE_KEY);
     localStorage.removeItem(METAS_CAPTACAO_CACHE_KEY);
     localStorage.removeItem(METAS_PROTAGONISMO_CACHE_KEY);
+    localStorage.removeItem(ACESSOS_CACHE_KEY);
     console.log("Caches limpos com sucesso!");
 };
 
@@ -448,5 +450,35 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
     } catch (error: any) {
         console.error("Erro ao carregar Protagonismo:", error);
         throw error; // Repassar para o componente tratar
+    }
+};
+
+export const fetchAllowedEmails = async (url: string = GOOGLE_SCRIPT_URL): Promise<string[]> => {
+    try {
+        const cached = localStorage.getItem(ACESSOS_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                return data;
+            }
+        }
+
+        const response = await fetch(`${url}?tab=Acessos`);
+        if (!response.ok) throw new Error(`Erro na API Acessos: ${response.statusText}`);
+
+        const rawData: any[] = await response.json();
+        const emails = rawData
+            .map(row => String(getVal(row, 'E_MAIL', 'EMAIL', 'E-MAIL') || '').toLowerCase().trim())
+            .filter(email => email !== '' && email.includes('@'));
+
+        localStorage.setItem(ACESSOS_CACHE_KEY, JSON.stringify({
+            data: emails,
+            timestamp: Date.now()
+        }));
+
+        return emails;
+    } catch (error) {
+        console.error("Erro ao carregar lista de acessos:", error);
+        return [];
     }
 };

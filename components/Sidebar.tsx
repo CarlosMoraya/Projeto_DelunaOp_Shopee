@@ -7,9 +7,11 @@ interface SidebarProps {
   onNavigate: (view: AppView) => void;
   isOpen: boolean;
   onClose: () => void;
+  userEmail: string | null;
+  onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onClose, userEmail, onLogout }) => {
   const menuItems = [
     { id: AppView.DELIVERY_SUCCESS, icon: 'dashboard', label: 'Delivery Success' },
     { id: AppView.COMPARATIVO, icon: 'compare_arrows', label: 'Comparativo DS' },
@@ -61,17 +63,26 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onCl
         </nav>
       </div>
 
-      <div className="px-4">
+      <div className="px-4 flex flex-col gap-4">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
           <div
-            className="w-10 h-10 rounded-full bg-cover bg-center border-2 border-deluna-accent"
-            style={{ backgroundImage: `url('https://picsum.photos/seed/admin/100/100')` }}
-          ></div>
+            className="w-10 h-10 rounded-full bg-cover bg-center border-2 border-deluna-accent flex items-center justify-center bg-white/20"
+          >
+            <span className="material-symbols-outlined text-white text-xl">person</span>
+          </div>
           <div className="flex flex-col overflow-hidden">
-            <p className="text-sm font-bold truncate text-white">Admin Deluna</p>
-            <p className="text-[10px] text-[#95D5B2] font-medium uppercase tracking-wider">Base Manager</p>
+            <p className="text-xs font-bold truncate text-white uppercase italic">{userEmail?.split('@')[0] || 'Usuário'}</p>
+            <p className="text-[9px] text-[#95D5B2] font-medium truncate opacity-60">{userEmail}</p>
           </div>
         </div>
+
+        <button
+          onClick={onLogout}
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-white/10 text-[#95D5B2] text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-all active:scale-95"
+        >
+          <span className="material-symbols-outlined text-sm">logout</span>
+          Sair do Sistema
+        </button>
       </div>
     </aside>
   );
