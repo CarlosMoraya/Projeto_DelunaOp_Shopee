@@ -146,7 +146,10 @@ export interface PNRRow {
 export interface PNROperationalDetail {
   driver: string;
   base: string;
+  coordinator: string;
   pnrCount: number;
+  revertedCount: number;
   totalPackets: number;
+  pendingCount: number;
   pnrPercentage: number;
 }
