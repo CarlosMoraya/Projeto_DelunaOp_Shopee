@@ -21,26 +21,6 @@ interface CampanhaRow {
   total: number;
 }
 
-const CAMPANHA_DATA: CampanhaRow[] = [
-  { base: 'LRJ01', localidade: 'São João do Meriti', lider: 'Edimilson', avatar: 'https://picsum.photos/seed/edimilson/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 100, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 950 },
-  { base: 'LRJ14', localidade: 'Duque de Caxias', lider: 'Edimilson', avatar: 'https://picsum.photos/seed/edimilson2/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 100, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 950 },
-  { base: 'LES03', localidade: 'Serra', lider: 'Caique', avatar: 'https://picsum.photos/seed/caique/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 100, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 950 },
-  { base: 'LRJ08', localidade: 'São Gonçalo', lider: 'Larissa', avatar: 'https://picsum.photos/seed/larissa/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 25, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 875 },
-  { base: 'LES09', localidade: 'Viana', lider: 'Cristiane', avatar: 'https://picsum.photos/seed/cristiane/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 100, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 950 },
-  { base: 'LRJ12', localidade: 'Nova Iguaçu', lider: 'Patrick', avatar: 'https://picsum.photos/seed/patrick/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LRJ04', localidade: 'Campo G', lider: 'Andreia', avatar: 'https://picsum.photos/seed/andreia/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LRJ23', localidade: 'São Gonçalo 2', lider: 'Rafael', avatar: '/avatars/Rafael.jpeg', regraAcesso: 'META3', carregamento: 500, qOperacional: 25, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 875 },
-  { base: 'LRJ07', localidade: 'São Cristóvão', lider: 'Thais', avatar: '/avatars/Thais.jpeg', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LBA14', localidade: 'Camaçari', lider: 'Lucineide', avatar: 'https://picsum.photos/seed/lucineide/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 25, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 875 },
-  { base: 'LRJ05', localidade: 'Macaé', lider: 'Rafael', avatar: 'https://picsum.photos/seed/rafael2/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LRJ02', localidade: 'Nova Friburgo', lider: 'Cristiane', avatar: '/avatars/Christiane.jpeg', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LRJ21', localidade: 'Cabo Frio', lider: 'Eduardo', avatar: '/avatars/Eduardo.jpeg', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LRJ15', localidade: 'Magé', lider: 'Poliana', avatar: 'https://picsum.photos/seed/poliana/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LBA18', localidade: 'Salvador', lider: 'Adriana', avatar: 'https://picsum.photos/seed/adriana/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LBA17', localidade: 'Simões Filho', lider: 'Luiza', avatar: 'https://picsum.photos/seed/luiza/200/200', regraAcesso: 'META3', carregamento: 500, qOperacional: 0, esforcoCaptacao: 100, controlePerdas: 200, protagonismo: 50, total: 850 },
-  { base: 'LRJ99', localidade: 'Teste', lider: 'Líder Sem Meta', avatar: 'https://picsum.photos/seed/semmeta/200/200', regraAcesso: '', carregamento: 0, qOperacional: 0, esforcoCaptacao: 0, controlePerdas: 0, protagonismo: 0, total: 0 },
-];
-
 const getDirectImageLink = (url: string) => {
   if (!url) return '';
   // Se o link já for um caminho local (começando com /)
@@ -145,7 +125,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
     const currentMonthName = monthsNames[start.getMonth()];
     const normalizedMonth = removeAccents(currentMonthName).toLowerCase();
 
-    CAMPANHA_DATA.forEach(row => {
+    protagonismoData.forEach(row => {
       const normalizedBase = normalize(row.base);
       const daysData = basesMap.get(normalizedBase);
 
@@ -276,28 +256,41 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
     return statusMap;
   }, [deliveryData, metasData, metasDSData, qlpData, metasCaptacaoData, protagonismoData, metasProtagonismoData, startDate, endDate]);
 
-  // Cálculo de dados finais combinando campos estáticos com prêmios dinâmicos
+  // No Leaderboard, usaremos os dados da 'Lista de Bases' (via protagonismoData) 
+  // para definir quem são os líderes e quais suas fotos.
   const finalLeaderboardData = useMemo(() => {
-    return CAMPANHA_DATA.map(row => {
-      const status = dynamicStatus.get(row.base);
+    // Se não carregou os dados das bases, retorna vazio
+    if (protagonismoData.length === 0) return [];
+
+    return protagonismoData.map(baseInfo => {
+      const status = dynamicStatus.get(baseInfo.base);
       const dynamicReward = (status && typeof status.rewardValue === 'number') ? status.rewardValue : 0;
       const operReward = (status && typeof status.operationalReward === 'number') ? status.operationalReward : 0;
       const captReward = (status && typeof status.captacaoReward === 'number') ? status.captacaoReward : 0;
       const protReward = (status && typeof status.protagonismoReward === 'number') ? status.protagonismoReward : 0;
 
-      // Novo total: Carr. dinâmico + Oper. dinâmico + Captação dinâmico + Perdas estático + Protagonismo dinâmico
-      const currentTotal = dynamicReward + operReward + captReward + row.controlePerdas + protReward;
+      // Cálculo de perdas (atualmente estático ou poderia vir de outra aba se houver)
+      // Como o usuário pediu para igualar ao Protagonismo que usa a Lista de Bases, 
+      // mantemos o controle de perdas como 0 ou buscamos de algum lugar se necessário.
+      // Por enquanto, usaremos 200 como padrão para quem tem acesso, para manter a estética do print anterior
+      const perdasEstetico = (status?.isAccess) ? 200 : 0;
+
+      const currentTotal = dynamicReward + operReward + captReward + perdasEstetico + protReward;
 
       return {
-        ...row,
+        base: baseInfo.base,
+        localidade: baseInfo.localidade,
+        lider: baseInfo.lider,
+        avatar: baseInfo.avatar,
         carregamento: dynamicReward,
         qOperacional: operReward,
         esforcoCaptacao: captReward,
-        protagonismo: protReward, // Sobrescreve com o dinâmico de Protagonismo
+        controlePerdas: perdasEstetico,
+        protagonismo: protReward,
         total: currentTotal
       };
     }).sort((a, b) => b.total - a.total);
-  }, [dynamicStatus]);
+  }, [dynamicStatus, protagonismoData]);
 
   const filteredLeaders = useMemo(() => {
     if (!searchTerm) return [];
