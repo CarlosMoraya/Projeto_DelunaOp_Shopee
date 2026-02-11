@@ -77,18 +77,17 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between bg-white border-b border-[#E2E8F0] px-4 md:px-10 py-5">
-      <div className="flex items-center gap-4">
+    <header className="sticky top-0 z-10 flex items-center justify-between bg-white border-b border-[#E2E8F0] px-4 md:px-10 py-4 min-h-[80px]">
+      <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
         <button
           onClick={onMenuClick}
-          className="lg:hidden flex items-center justify-center h-10 w-10 border border-[#E2E8F0] rounded-lg text-deluna-primary"
+          className="lg:hidden flex-shrink-0 flex items-center justify-center h-10 w-10 border border-[#E2E8F0] rounded-lg text-deluna-primary shadow-sm"
         >
           <span className="material-symbols-outlined">menu</span>
         </button>
 
-        <div className="flex items-center border-r border-slate-200 pr-4 mr-2">
-          <div className="h-16 min-w-[180px] px-3 flex items-center justify-center overflow-hidden">
-
+        <div className="hidden md:flex items-center border-r border-slate-200 pr-4 mr-2">
+          <div className="h-14 min-w-[150px] px-2 flex items-center justify-center overflow-hidden">
             {/* Lógica: Se tiver URL e não tiver dado erro, tenta mostrar imagem. Senão, mostra Fallback. */}
             {finalLogoUrl && !imgError ? (
               <img
@@ -107,11 +106,10 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
               </div>
             )}
-
           </div>
         </div>
 
-        <h2 className="text-base md:text-xl font-extrabold text-deluna-primary tracking-tight truncate max-w-[200px] md:max-w-none">
+        <h2 className="text-[11px] tiny:text-xs xs:text-sm md:text-xl font-extrabold text-deluna-primary tracking-tight truncate flex-shrink">
           {getTitle()}
         </h2>
       </div>
@@ -138,26 +136,33 @@ const Header: React.FC<HeaderProps> = ({
             />
           </div>
         </div>
-        <div className="hidden sm:block h-8 w-[1px] bg-slate-200 mx-2"></div>
+        <div className="flex items-center gap-1.5 md:gap-3 flex-shrink-0">
+          {/* Botão de Refresh Manual */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Atualizar dados da planilha"
+            className={`flex items-center justify-center rounded-xl h-10 w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-slate-50 transition-all shadow-sm ${isRefreshing ? 'opacity-50' : ''}`}
+          >
+            <span className={`material-symbols-outlined text-[20px] ${isRefreshing ? 'animate-spin' : ''}`}>
+              sync
+            </span>
+          </button>
 
-        {/* Botão de Refresh Manual */}
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          title="Atualizar dados da planilha"
-          className={`flex items-center justify-center rounded-lg h-9 w-9 md:h-10 md:w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-[#F8FAFC] transition-all ${isRefreshing ? 'opacity-50' : ''}`}
-        >
-          <span className={`material-symbols-outlined text-[18px] md:text-[20px] ${isRefreshing ? 'animate-spin' : ''}`}>
-            sync
-          </span>
-        </button>
+          <button
+            title="Notificações"
+            className="hidden xs:flex items-center justify-center rounded-xl h-10 w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-slate-50 shadow-sm"
+          >
+            <span className="material-symbols-outlined text-[20px]">notifications</span>
+          </button>
 
-        <button className="flex items-center justify-center rounded-lg h-9 w-9 md:h-10 md:w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-[#F8FAFC]">
-          <span className="material-symbols-outlined text-[18px] md:text-[20px]">notifications</span>
-        </button>
-        <button className="flex items-center justify-center rounded-lg h-9 w-9 md:h-10 md:w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-[#F8FAFC]">
-          <span className="material-symbols-outlined text-[18px] md:text-[20px]">settings</span>
-        </button>
+          <button
+            title="Configurações"
+            className="hidden xs:flex items-center justify-center rounded-xl h-10 w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-slate-50 shadow-sm"
+          >
+            <span className="material-symbols-outlined text-[20px]">settings</span>
+          </button>
+        </div>
       </div>
     </header>
   );
