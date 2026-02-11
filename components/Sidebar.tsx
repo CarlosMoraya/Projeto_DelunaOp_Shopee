@@ -8,10 +8,11 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   userEmail: string | null;
+  userName: string | null;
   onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onClose, userEmail, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onClose, userEmail, userName, onLogout }) => {
   const menuItems = [
     { id: AppView.DELIVERY_SUCCESS, icon: 'dashboard', label: 'Delivery Success' },
     { id: AppView.COMPARATIVO, icon: 'compare_arrows', label: 'Comparativo DS' },
@@ -71,7 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onCl
             <span className="material-symbols-outlined text-white text-xl">person</span>
           </div>
           <div className="flex flex-col overflow-hidden">
-            <p className="text-xs font-bold truncate text-white uppercase italic">{userEmail?.split('@')[0] || 'Usuário'}</p>
+            <p className="text-xs font-bold truncate text-white uppercase italic">{userName || userEmail?.split('@')[0] || 'Usuário'}</p>
             <p className="text-[9px] text-[#95D5B2] font-medium truncate opacity-60">{userEmail}</p>
           </div>
         </div>

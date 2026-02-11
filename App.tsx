@@ -16,26 +16,45 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   // Verificação inicial de autenticação
   useEffect(() => {
     const savedEmail = localStorage.getItem('deluna_user_email');
+    const savedName = localStorage.getItem('deluna_user_name');
     if (savedEmail) {
       setUserEmail(savedEmail);
+      setUserName(savedName);
       setIsAuthenticated(true);
+
+      // Se tiver e-mail mas não tiver nome (ou para garantir atualização), busca na API
+      if (!savedName) {
+        import('./services/api').then(({ fetchAccessData }) => {
+          fetchAccessData().then(accessData => {
+            const match = accessData.find(item => item.email === savedEmail.toLowerCase().trim());
+            if (match && match.user) {
+              setUserName(match.user);
+              localStorage.setItem('deluna_user_name', match.user);
+            }
+          });
+        });
+      }
     }
     setCheckingAuth(false);
   }, []);
 
-  const handleLoginSuccess = (email: string) => {
+  const handleLoginSuccess = (email: string, userName: string) => {
     setUserEmail(email);
+    setUserName(userName);
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('deluna_user_email');
+    localStorage.removeItem('deluna_user_name');
     setUserEmail(null);
+    setUserName(null);
     setIsAuthenticated(false);
   };
 
@@ -96,6 +115,7 @@ const App: React.FC = () => {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         userEmail={userEmail}
+        userName={userName}
         onLogout={handleLogout}
       />
 

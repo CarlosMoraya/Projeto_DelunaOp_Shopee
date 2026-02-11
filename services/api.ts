@@ -1,5 +1,5 @@
 
-import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow } from '../types';
+import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow, AccessData } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
@@ -455,7 +455,7 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
     }
 };
 
-export const fetchAllowedEmails = async (url: string = GOOGLE_SCRIPT_URL): Promise<string[]> => {
+export const fetchAccessData = async (url: string = GOOGLE_SCRIPT_URL): Promise<AccessData[]> => {
     try {
         const cached = localStorage.getItem(ACESSOS_CACHE_KEY);
         if (cached) {
@@ -469,20 +469,31 @@ export const fetchAllowedEmails = async (url: string = GOOGLE_SCRIPT_URL): Promi
         if (!response.ok) throw new Error(`Erro na API Acessos: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
-        const emails = rawData
-            .map(row => String(getVal(row, 'E_MAIL', 'EMAIL', 'E-MAIL') || '').toLowerCase().trim())
-            .filter(email => email !== '' && email.includes('@'));
+        const accessInfos = rawData
+            .filter(row => {
+                const email = String(getVal(row, 'E_MAIL', 'EMAIL', 'E-MAIL') || '');
+                return email !== '' && email.includes('@');
+            })
+            .map(row => ({
+                email: String(getVal(row, 'E_MAIL', 'EMAIL', 'E-MAIL') || '').toLowerCase().trim(),
+                user: String(getVal(row, 'USUARIOS', 'USUARIO', 'USER', 'NOME', 'USUÁRIO', 'USUÁRIOS') || '').trim()
+            }));
 
         localStorage.setItem(ACESSOS_CACHE_KEY, JSON.stringify({
-            data: emails,
+            data: accessInfos,
             timestamp: Date.now()
         }));
 
-        return emails;
+        return accessInfos;
     } catch (error) {
-        console.error("Erro ao carregar lista de acessos:", error);
+        console.error("Erro ao carregar dados de acesso:", error);
         return [];
     }
+};
+
+export const fetchAllowedEmails = async (url: string = GOOGLE_SCRIPT_URL): Promise<string[]> => {
+    const data = await fetchAccessData(url);
+    return data.map(item => item.email);
 };
 
 export const fetchPNRData = async (url: string = GOOGLE_SCRIPT_URL): Promise<PNRRow[]> => {

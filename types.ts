@@ -153,3 +153,8 @@ export interface PNROperationalDetail {
   pendingCount: number;
   pnrPercentage: number;
 }
+
+export interface AccessData {
+  email: string;
+  user: string;
+}

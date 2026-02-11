@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { fetchAllowedEmails } from '../services/api';
+import { fetchAccessData } from '../services/api';
 
 interface LoginProps {
-    onLoginSuccess: (email: string) => void;
+    onLoginSuccess: (email: string, userName: string) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
@@ -21,13 +21,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         setError(null);
 
         try {
-            const allowedEmails = await fetchAllowedEmails();
+            const accessData = await fetchAccessData();
             const normalizedEmail = email.toLowerCase().trim();
+            const userMatch = accessData.find(item => item.email === normalizedEmail);
 
-            if (allowedEmails.includes(normalizedEmail)) {
+            if (userMatch) {
                 // Sucesso
                 localStorage.setItem('deluna_user_email', normalizedEmail);
-                onLoginSuccess(normalizedEmail);
+                localStorage.setItem('deluna_user_name', userMatch.user);
+                onLoginSuccess(normalizedEmail, userMatch.user);
             } else {
                 setError('Sem acesso! Solicite acesso ao administrador do sistema');
             }
