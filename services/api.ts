@@ -455,17 +455,18 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
     }
 };
 
-export const fetchAccessData = async (url: string = GOOGLE_SCRIPT_URL): Promise<AccessData[]> => {
+export const fetchAccessData = async (url: string = GOOGLE_SCRIPT_URL, forceRefresh: boolean = false): Promise<AccessData[]> => {
     try {
         const cached = localStorage.getItem(ACESSOS_CACHE_KEY);
-        if (cached) {
+        if (cached && !forceRefresh) {
             const { data, timestamp } = JSON.parse(cached);
             if (Date.now() - timestamp < CACHE_DURATION) {
                 return data;
             }
         }
 
-        const response = await fetch(`${url}?tab=Acessos`);
+        const uniqueParam = forceRefresh ? `&_t=${Date.now()}` : '';
+        const response = await fetch(`${url}?tab=Acessos${uniqueParam}`);
         if (!response.ok) throw new Error(`Erro na API Acessos: ${response.statusText}`);
 
         const rawData: any[] = await response.json();

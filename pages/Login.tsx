@@ -21,9 +21,17 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         setError(null);
 
         try {
-            const accessData = await fetchAccessData();
-            const normalizedEmail = email.toLowerCase().trim();
-            const userMatch = accessData.find(item => item.email === normalizedEmail);
+            const normalizedEmail = email.toLowerCase().replace(/\s/g, '').trim();
+
+            // Tenta validar com cache primeiro
+            let accessData = await fetchAccessData();
+            let userMatch = accessData.find(item => item.email === normalizedEmail);
+
+            // Se não encontrou, tenta forçar um refresh da planilha (caso o e-mail tenha sido adicionado recentemente)
+            if (!userMatch) {
+                accessData = await fetchAccessData(undefined, true);
+                userMatch = accessData.find(item => item.email === normalizedEmail);
+            }
 
             if (userMatch) {
                 // Sucesso
@@ -31,10 +39,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 localStorage.setItem('deluna_user_name', userMatch.user);
                 onLoginSuccess(normalizedEmail, userMatch.user);
             } else {
-                setError('Sem acesso! Solicite acesso ao administrador do sistema');
+                setError(`Sem acesso para: ${normalizedEmail}. Solicite acesso ao administrador.`);
             }
         } catch (err) {
-            setError('Erro ao validar acesso. Tente novamente mais tarde.');
+            setError(`Erro ao validar acesso: ${err instanceof Error ? err.message : String(err)}`);
             console.error(err);
         } finally {
             setLoading(false);
@@ -71,6 +79,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="nome@exemplo.com"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck="false"
                                 className={`w-full h-14 pl-12 pr-4 bg-slate-50 border-2 rounded-2xl outline-none transition-all font-bold text-deluna-primary placeholder:text-slate-300 ${error ? 'border-red-100 focus:border-red-300' : 'border-slate-50 focus:border-deluna-primary focus:bg-white'}`}
                                 disabled={loading}
                             />
