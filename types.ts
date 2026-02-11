@@ -158,3 +158,9 @@ export interface AccessData {
   email: string;
   user: string;
 }
+
+export interface MetaPerdasData {
+  base: string;
+  valorMetaPNR: number; // Porcentagem (ex: 0.20)
+  valorPremio: number;
+}

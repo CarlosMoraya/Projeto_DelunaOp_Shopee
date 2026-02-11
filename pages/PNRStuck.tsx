@@ -459,13 +459,13 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                                         <td className="px-8 py-5 text-sm text-right font-black text-red-600">{row.pnrCount}</td>
                                         <td className="px-8 py-5 text-sm text-right font-black text-slate-400">{row.totalPackets}</td>
                                         <td className="px-8 py-5 text-sm text-right">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${row.pnrPercentage > 1.00 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${row.pnrPercentage > 0.50 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                                                 {row.pnrPercentage.toFixed(2)}%
                                             </span>
                                         </td>
-                                        <td className="px-8 py-5 text-center text-[11px] font-bold text-slate-500">1.00%</td>
+                                        <td className="px-8 py-5 text-center text-[11px] font-bold text-slate-500">0.50%</td>
                                         <td className="px-8 py-5 text-center">
-                                            {row.pnrPercentage <= 1.00 ? (
+                                            {row.pnrPercentage <= 0.50 ? (
                                                 <div className="flex items-center justify-center gap-1.5 text-green-600">
                                                     <span className="material-symbols-outlined text-base">check_circle</span>
                                                     <span className="text-[10px] font-black uppercase tracking-tight">Alcançada</span>

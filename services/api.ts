@@ -1,5 +1,5 @@
 
-import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow, AccessData } from '../types';
+import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow, AccessData, MetaPerdasData } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
@@ -12,6 +12,7 @@ const METAS_CAPTACAO_CACHE_KEY = 'metas_captacao_data_cache_v1';
 const METAS_PROTAGONISMO_CACHE_KEY = 'metas_protagonismo_data_cache_v1';
 const ACESSOS_CACHE_KEY = 'acessos_data_cache_v1';
 const PNR_CACHE_KEY = 'pnr_data_cache_v4';
+const METAS_PERDAS_CACHE_KEY = 'metas_perdas_data_cache_v1';
 const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 horas
 
 /**
@@ -26,6 +27,7 @@ export const clearApiCache = () => {
     localStorage.removeItem(METAS_PROTAGONISMO_CACHE_KEY);
     localStorage.removeItem(ACESSOS_CACHE_KEY);
     localStorage.removeItem(PNR_CACHE_KEY);
+    localStorage.removeItem(METAS_PERDAS_CACHE_KEY);
     console.log("Caches limpos com sucesso!");
 };
 
@@ -576,6 +578,60 @@ export const fetchPNRData = async (url: string = GOOGLE_SCRIPT_URL): Promise<PNR
 
     } catch (error) {
         console.error("Falha ao buscar dados de PNR:", error);
+        return [];
+    }
+};
+
+export const fetchMetaPerdasData = async (url: string = GOOGLE_SCRIPT_URL): Promise<MetaPerdasData[]> => {
+    try {
+        const cached = localStorage.getItem(METAS_PERDAS_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                return data;
+            }
+        }
+
+        const response = await fetch(`${url}?tab=Meta_Perdas`);
+        if (!response.ok) throw new Error(`Erro na API Meta_Perdas: ${response.statusText}`);
+
+        const rawData: any[] = await response.json();
+        const processed = rawData.map(row => {
+            let metaVal = parseNum(getVal(row, 'VALOR_META_PNR', 'Valor_Meta_PNR') || 0);
+
+            // CORREÇÃO: Se a meta vier como decimal (ex: 0.002 para 0.20%), convertemos para porcentagem (0.20)
+            // Assumimos que metas válidas de PNR são menores que 100%. Se for < 1, é muito provável que seja decimal.
+            // Mas cuidado: 0.5% pode vir como 0.005.
+            // Se o usuário digitou 0.20 (pensando em %), o parseNum retorna 0.20.
+            // Se digitou 0,20% (texto), o parseNum retorna 0.20 (se a regex limpar o %) ou 0.002 se o Sheets mandar raw.
+            // Vamos padronizar: se for <= 1, multiplicamos por 100.
+            if (metaVal <= 1 && metaVal > 0) {
+                metaVal = metaVal * 100;
+            }
+
+            return {
+                base: String(getVal(row, 'BASES', 'BASE') || '').trim(),
+                valorMetaPNR: metaVal,
+                valorPremio: parseNum(getVal(row, 'VALOR_PREMIO', 'Valor_Premio') || 0)
+            };
+        });
+
+        // Se não encontrar dados (ex: erro de cache ou fetch), retorna vazio para evitar quebras
+        if (!processed || processed.length === 0) {
+            const cached = localStorage.getItem(METAS_PERDAS_CACHE_KEY);
+            if (cached) {
+                return JSON.parse(cached).data;
+            }
+        }
+
+        localStorage.setItem(METAS_PERDAS_CACHE_KEY, JSON.stringify({
+            data: processed,
+            timestamp: Date.now()
+        }));
+
+        return processed;
+    } catch (error) {
+        console.error("Erro ao carregar Metas_Perdas:", error);
         return [];
     }
 };
