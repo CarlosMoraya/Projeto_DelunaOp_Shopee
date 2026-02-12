@@ -46,10 +46,17 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
     loadData();
   }, []);
 
+  // Função auxiliar para converter string YYYY-MM-DD para Date local (evita problemas de timezone)
+  const parseLocalDate = (dateStr: string) => {
+    if (!dateStr) return new Date(NaN);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   // Função para calcular o período anterior (mesmo range no mês anterior)
   const getPreviousPeriod = useMemo(() => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = parseLocalDate(startDate);
+    const end = parseLocalDate(endDate);
 
     const prevStart = new Date(start);
     prevStart.setMonth(prevStart.getMonth() - 1);
@@ -66,9 +73,9 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
   // Filtrar dados por período
   const filterByPeriod = (data: DeliveryData[], start: string, end: string) => {
     return data.filter(row => {
-      const rowDate = new Date(row.date).getTime();
-      const startTime = new Date(start).getTime();
-      const endTime = new Date(end).getTime();
+      const rowDate = parseLocalDate(row.date).getTime();
+      const startTime = parseLocalDate(start).getTime();
+      const endTime = parseLocalDate(end).getTime();
       return rowDate >= startTime && rowDate <= endTime;
     });
   };
@@ -250,7 +257,7 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
   // Formatar labels dos períodos
   const periodLabels = useMemo(() => {
     const formatDate = (dateStr: string) => {
-      const d = new Date(dateStr);
+      const d = parseLocalDate(dateStr);
       return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     };
     return {

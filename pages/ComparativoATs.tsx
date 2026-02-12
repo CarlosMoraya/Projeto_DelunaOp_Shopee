@@ -52,10 +52,17 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
 
 
 
+  // Função auxiliar para converter string YYYY-MM-DD para Date local (evita problemas de timezone)
+  const parseLocalDate = (dateStr: string) => {
+    if (!dateStr) return new Date(NaN);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   // Calcular período anterior (mesmo intervalo no mês anterior)
   const getPreviousPeriod = useMemo(() => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = parseLocalDate(startDate);
+    const end = parseLocalDate(endDate);
 
     const prevStart = new Date(start);
     prevStart.setMonth(prevStart.getMonth() - 1);
@@ -71,10 +78,10 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
 
   // Função auxiliar de filtro
   const filterByPeriod = (data: DeliveryData[], start: string, end: string) => {
-    const startTime = new Date(start).getTime();
-    const endTime = new Date(end).getTime();
+    const startTime = parseLocalDate(start).getTime();
+    const endTime = parseLocalDate(end).getTime();
     return data.filter(row => {
-      const rowDate = new Date(row.date).getTime();
+      const rowDate = parseLocalDate(row.date).getTime();
       return rowDate >= startTime && rowDate <= endTime;
     });
   };
@@ -209,12 +216,8 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
       // Validar datas
       if (!startDate || !endDate) return 0;
 
-      // Parse manual para evitar problemas de timezone (YYYY-MM-DD)
-      const [year1, month1, day1] = startDate.split('-').map(Number);
-      const [year2, month2, day2] = endDate.split('-').map(Number);
-
-      const start = new Date(year1, month1 - 1, day1);
-      const end = new Date(year2, month2 - 1, day2);
+      const start = parseLocalDate(startDate);
+      const end = parseLocalDate(endDate);
 
       if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
 

@@ -47,12 +47,19 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
     loadData();
   }, []);
 
+  // Função auxiliar para converter string YYYY-MM-DD para Date local (evita problemas de timezone)
+  const parseLocalDate = (dateStr: string) => {
+    if (!dateStr) return new Date(NaN);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   // Função auxiliar de filtro por período
   const getFilteredDataByPeriod = (data: DeliveryData[], startStr: string, endStr: string) => {
-    const start = new Date(startStr).getTime();
-    const end = new Date(endStr).getTime();
+    const start = parseLocalDate(startStr).getTime();
+    const end = parseLocalDate(endStr).getTime();
     return data.filter(row => {
-      const rowDate = new Date(row.date).getTime();
+      const rowDate = parseLocalDate(row.date).getTime();
       const matchCoord = !selectedCoordinator || row.coordinator === selectedCoordinator;
       const matchHub = !selectedHub || row.hub === selectedHub;
       const matchDriver = !driverSearch || row.driver.toLowerCase().includes(driverSearch.toLowerCase());
@@ -68,8 +75,8 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
   // Calcular período anterior (mesmo intervalo no mês anterior)
   const previousPeriodRange = useMemo(() => {
     if (!startDate || !endDate) return null;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = parseLocalDate(startDate);
+    const end = parseLocalDate(endDate);
 
     const prevStart = new Date(start);
     prevStart.setMonth(prevStart.getMonth() - 1);
@@ -92,8 +99,8 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
   const paginatedData = useMemo(() => {
     // 1. Ordena por Data (Mais recente primeiro)
     const sorted = [...filteredTableData].sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
+      const dateA = parseLocalDate(a.date).getTime();
+      const dateB = parseLocalDate(b.date).getTime();
       if (!isNaN(dateA) && !isNaN(dateB)) {
         return dateB - dateA;
       }
@@ -182,7 +189,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
     const grouped = new Map<string, { totalAtQuantity: number, delivered: number, atCodes: Set<string>, sortKey: string, dateObj: Date }>();
 
     filteredTableData.forEach(row => {
-      const date = new Date(row.date);
+      const date = parseLocalDate(row.date);
       if (isNaN(date.getTime())) return;
 
       let groupKey = '';
@@ -245,7 +252,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
 
     const result = Array.from(grouped.entries()).map(([key, stats]) => {
       let displayLabel = '';
-      const d = new Date(stats.sortKey);
+      const d = parseLocalDate(stats.sortKey);
       if (historyRange === 'day') {
         displayLabel = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       } else if (historyRange === 'week') {
@@ -274,11 +281,11 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
     const map = new Map<string, { totalAt: number, totalDelivered: number }>();
 
     // Filtramos para o gráfico de Coordenadores: Período + Hub + Motorista (Exceto o próprio coordenador)
-    const start = new Date(startDate).getTime();
-    const end = new Date(endDate).getTime();
+    const start = parseLocalDate(startDate).getTime();
+    const end = parseLocalDate(endDate).getTime();
 
     const filtered = tableData.filter(row => {
-      const rowDate = new Date(row.date).getTime();
+      const rowDate = parseLocalDate(row.date).getTime();
       const matchHub = !selectedHub || row.hub === selectedHub;
       const matchDriver = !driverSearch || row.driver.toLowerCase().includes(driverSearch.toLowerCase());
       const matchDate = (!startDate || rowDate >= start) && (!endDate || rowDate <= end);
@@ -310,11 +317,11 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
     const map = new Map<string, { totalAt: number, totalDelivered: number }>();
 
     // Hub chart é filtrado por COORDENADOR e PERÍODO (mas não por ele mesmo)
-    const start = new Date(startDate).getTime();
-    const end = new Date(endDate).getTime();
+    const start = parseLocalDate(startDate).getTime();
+    const end = parseLocalDate(endDate).getTime();
 
     const hubFilterSource = tableData.filter(row => {
-      const rowDate = new Date(row.date).getTime();
+      const rowDate = parseLocalDate(row.date).getTime();
       const matchCoord = !selectedCoordinator || row.coordinator === selectedCoordinator;
       const matchDriver = !driverSearch || row.driver.toLowerCase().includes(driverSearch.toLowerCase());
       const matchDate = (!startDate || rowDate >= start) && (!endDate || rowDate <= end);
@@ -610,7 +617,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
                     paginatedData.map((row, i) => (
                       <tr key={i} className="hover:bg-[#F8FAFC]">
                         <td className="px-6 md:px-8 py-4 md:py-5 text-xs md:text-sm font-medium text-[#475569]">
-                          {new Date(row.date).toLocaleDateString('pt-BR') !== 'Invalid Date' ? new Date(row.date).toLocaleDateString('pt-BR') : row.date}
+                          {parseLocalDate(row.date).toLocaleDateString('pt-BR') !== 'Invalid Date' ? parseLocalDate(row.date).toLocaleDateString('pt-BR') : row.date}
                         </td>
                         <td className="px-6 md:px-8 py-4 md:py-5 text-xs md:text-sm font-bold text-[#64748B]">{row.id}</td>
                         <td className="px-6 md:px-8 py-4 md:py-5 text-xs md:text-sm font-bold text-deluna-primary">{row.atCode}</td>
