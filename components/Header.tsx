@@ -110,7 +110,7 @@ const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <h2 className="hidden xs:block text-[10px] tiny:text-[11px] xs:text-xs md:text-xl font-extrabold text-deluna-primary tracking-tight truncate">
+        <h2 className="hidden md:block text-xl font-extrabold text-deluna-primary tracking-tight truncate">
           {getTitle()}
         </h2>
       </div>
