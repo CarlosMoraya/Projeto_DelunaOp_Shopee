@@ -68,6 +68,24 @@ const App: React.FC = () => {
     return new Date().toISOString().split('T')[0];
   });
 
+  // Busca a data mais recente da planilha para inicializar o filtro 'Até'
+  useEffect(() => {
+    if (isAuthenticated) {
+      import('./services/api').then(({ fetchDeliveryData }) => {
+        fetchDeliveryData().then(data => {
+          if (data && data.length > 0) {
+            // Os dados já vêm ordenados por data decrescente da API
+            const latestDate = data[0].date;
+            if (latestDate) {
+              setEndDate(latestDate);
+              console.log("Filtro de data final atualizado para a mais recente da planilha:", latestDate);
+            }
+          }
+        });
+      });
+    }
+  }, [isAuthenticated]);
+
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   const renderView = () => {
