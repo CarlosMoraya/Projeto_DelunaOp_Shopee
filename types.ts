@@ -6,7 +6,8 @@ export enum AppView {
   LEADERBOARD = 'leaderboard',
   COMPARATIVO = 'comparativo',
   COMPARATIVO_ATS = 'comparativo_ats',
-  PNR_STUCK = 'pnr_stuck'
+  PNR_STUCK = 'pnr_stuck',
+  BANCO_VIRTUAL = 'banco_virtual'
 }
 
 export interface MetricCardProps {
@@ -163,4 +164,16 @@ export interface MetaPerdasData {
   base: string;
   valorMetaPNR: number; // Porcentagem (ex: 0.20)
   valorPremio: number;
+}
+
+export interface VirtualBankData {
+  base: string;
+  coordinator: string;
+  lider: string;
+  atualmente_acumulado: number;
+  previsao_bonus: number;
+  qtde_meses: number;
+  meta_alcancada: boolean;
+  status_texto: string;
+  data_referencia: string;
 }

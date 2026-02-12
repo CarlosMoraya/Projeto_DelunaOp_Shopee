@@ -21,6 +21,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onCl
     { id: AppView.PROTAGONISMO, icon: 'military_tech', label: 'Protagonismo' },
     { id: AppView.PNR_STUCK, icon: 'error_outline', label: 'Gestão PNR' },
     { id: AppView.LEADERBOARD, icon: 'format_list_numbered', label: 'Campanha Acelera +30' },
+    { id: AppView.BANCO_VIRTUAL, icon: 'account_balance_wallet', label: 'Banco Virtual' },
   ];
 
   return (

@@ -73,11 +73,12 @@ const Header: React.FC<HeaderProps> = ({
       case AppView.PROTAGONISMO: return <>Performance de Protagonismo <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Base</span></>;
       case AppView.PNR_STUCK: return <>Gestão de PNR & Stuck <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão Logística</span></>;
       case AppView.LEADERBOARD: return <>Campanha Acelera + 30 <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Base</span></>;
+      case AppView.BANCO_VIRTUAL: return <>Banco Virtual <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Acumulado de Ganhos</span></>;
     }
   };
 
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between bg-white border-b border-[#E2E8F0] px-4 md:px-10 py-4 min-h-[80px]">
+    <header className="sticky top-0 z-30 flex items-center justify-between bg-white border-b border-[#E2E8F0] px-4 md:px-10 py-4 min-h-[80px]">
       <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
         <button
           onClick={onMenuClick}

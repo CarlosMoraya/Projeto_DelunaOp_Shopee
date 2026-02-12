@@ -1,5 +1,5 @@
 
-import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow, AccessData, MetaPerdasData } from '../types';
+import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow, AccessData, MetaPerdasData, VirtualBankData } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
@@ -634,4 +634,51 @@ export const fetchMetaPerdasData = async (url: string = GOOGLE_SCRIPT_URL): Prom
         console.error("Erro ao carregar Metas_Perdas:", error);
         return [];
     }
+};
+
+/**
+ * Busca os dados do Banco Virtual (Saldo Acumulado) da campanha.
+ * Placeholder: Aba 'Banco_Virtual' (a ser criada pelo usuário)
+ */
+export const fetchVirtualBankData = async (url: string = GOOGLE_SCRIPT_URL): Promise<VirtualBankData[]> => {
+    try {
+        // O usuário ainda vai criar a aba, então vamos tentar buscar, se falhar retornamos vazio ou mock.
+        const response = await fetch(`${url}?tab=Banco_Virtual`);
+
+        if (!response.ok) {
+            console.warn("Aba 'Banco_Virtual' não encontrada ou erro na API. Retornando dados de exemplo.");
+            return getMockBankData();
+        }
+
+        const rawData: any[] = await response.json();
+
+        if (!Array.isArray(rawData) || rawData.length === 0) {
+            return getMockBankData();
+        }
+
+        return rawData.map(row => ({
+            base: String(getVal(row, 'BASE') || 'S/B'),
+            coordinator: String(getVal(row, 'COORDENADOR') || 'S/C'),
+            lider: String(getVal(row, 'LIDER') || 'S/L'),
+            atualmente_acumulado: parseNum(getVal(row, 'ACUMULADO')),
+            previsao_bonus: 0, // Será calculado dinamicamente com base no Leaderboard
+            qtde_meses: parseNum(getVal(row, 'MESES_CAMPANHA', 'QTDE_MESES')),
+            meta_alcancada: String(getVal(row, 'STATUS')).toUpperCase().includes('ALCAN') ||
+                String(getVal(row, 'STATUS')).toUpperCase().includes('SIM') ||
+                String(getVal(row, 'STATUS')).toUpperCase().includes('ATIVO'),
+            status_texto: String(getVal(row, 'STATUS') || 'N/A'),
+            data_referencia: String(getVal(row, 'DATA', 'DATE') || '')
+        }));
+    } catch (error) {
+        console.error("Erro ao buscar dados do Banco Virtual:", error);
+        return getMockBankData();
+    }
+};
+
+// Função interna apenas para fornecer dados enquanto a aba não existe
+const getMockBankData = (): VirtualBankData[] => {
+    return [
+        { base: 'EXEMPLO RJ', coordinator: 'COORD 1', lider: 'LIDER A', atualmente_acumulado: 1250.50, previsao_bonus: 500, qtde_meses: 2, meta_alcancada: true, status_texto: 'Alcançada', data_referencia: '2026-02-01' },
+        { base: 'EXEMPLO SP', coordinator: 'COORD 2', lider: 'LIDER B', atualmente_acumulado: 800.00, previsao_bonus: 300, qtde_meses: 1, meta_alcancada: false, status_texto: 'Pendente', data_referencia: '2026-02-01' },
+    ];
 };
