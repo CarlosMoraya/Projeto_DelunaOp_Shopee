@@ -65,6 +65,10 @@ const App: React.FC = () => {
     return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState(() => {
+    // Tenta recuperar do sessionStorage para manter a data sincronizada pós-refresh
+    const cachedEndDate = sessionStorage.getItem('deluna_sync_end_date');
+    if (cachedEndDate) return cachedEndDate;
+
     return new Date().toISOString().split('T')[0];
   });
 
@@ -78,7 +82,8 @@ const App: React.FC = () => {
             const latestDate = data[0].date;
             if (latestDate) {
               setEndDate(latestDate);
-              console.log("Filtro de data final atualizado para a mais recente da planilha:", latestDate);
+              sessionStorage.setItem('deluna_sync_end_date', latestDate);
+              console.log("Filtro de data final atualizado e persistido:", latestDate);
             }
           }
         });
