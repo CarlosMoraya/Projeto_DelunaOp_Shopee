@@ -47,10 +47,12 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
     loadData();
   }, []);
 
-  // Função auxiliar para converter string YYYY-MM-DD para Date local (evita problemas de timezone)
+  // Função auxiliar para converter string YYYY-MM-DD (ou ISO) para Date local
   const parseLocalDate = (dateStr: string) => {
     if (!dateStr) return new Date(NaN);
-    const [year, month, day] = dateStr.split('-').map(Number);
+    // Garante que pegamos apenas a parte da data YYYY-MM-DD
+    const cleanDate = dateStr.split('T')[0];
+    const [year, month, day] = cleanDate.split('-').map(Number);
     return new Date(year, month - 1, day);
   };
 
@@ -213,11 +215,11 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
         endOfWeek.setDate(startOfWeek.getDate() + 6);
 
         label = `Sem ${startOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-        sortKey = startOfWeek.toISOString();
+        sortKey = startOfWeek.toISOString().split('T')[0];
       } else if (historyRange === 'month') {
         groupKey = `${date.getFullYear()}-${date.getMonth()}`;
         label = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).toUpperCase();
-        sortKey = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
+        sortKey = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
       }
 
       const current = grouped.get(groupKey) || {
