@@ -110,30 +110,30 @@ const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <h2 className="text-[11px] tiny:text-xs xs:text-sm md:text-xl font-extrabold text-deluna-primary tracking-tight truncate flex-shrink">
+        <h2 className="text-[10px] tiny:text-[11px] xs:text-xs md:text-xl font-extrabold text-deluna-primary tracking-tight truncate flex-shrink">
           {getTitle()}
         </h2>
       </div>
 
-      <div className="flex items-center gap-2 md:gap-3">
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg">
+      <div className="flex items-center gap-1.5 md:gap-3">
+        <div className="flex items-center gap-1 md:gap-2 px-1.5 md:px-3 py-1 md:py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg">
           <div className="flex items-center gap-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">De:</span>
+            <span className="hidden xs:inline text-[10px] font-bold text-slate-400 uppercase">De:</span>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="bg-transparent text-xs font-bold text-deluna-primary outline-none focus:ring-0 border-none cursor-pointer p-0"
+              className="bg-transparent text-[10px] md:text-xs font-bold text-deluna-primary outline-none focus:ring-0 border-none cursor-pointer p-0 w-[90px] md:w-auto"
             />
           </div>
-          <div className="w-[1px] h-4 bg-slate-200 mx-1"></div>
+          <div className="w-[1px] h-4 bg-slate-200 mx-0.5 md:mx-1"></div>
           <div className="flex items-center gap-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Até:</span>
+            <span className="hidden xs:inline text-[10px] font-bold text-slate-400 uppercase">Até:</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="bg-transparent text-xs font-bold text-deluna-primary outline-none focus:ring-0 border-none cursor-pointer p-0"
+              className="bg-transparent text-[10px] md:text-xs font-bold text-deluna-primary outline-none focus:ring-0 border-none cursor-pointer p-0 w-[90px] md:w-auto"
             />
           </div>
         </div>
