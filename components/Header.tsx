@@ -110,58 +110,44 @@ const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <h2 className="text-[10px] tiny:text-[11px] xs:text-xs md:text-xl font-extrabold text-deluna-primary tracking-tight truncate flex-shrink">
+        <h2 className="hidden xs:block text-[10px] tiny:text-[11px] xs:text-xs md:text-xl font-extrabold text-deluna-primary tracking-tight truncate">
           {getTitle()}
         </h2>
       </div>
 
-      <div className="flex items-center gap-1.5 md:gap-3">
-        <div className="flex items-center gap-1 md:gap-2 px-1.5 md:px-3 py-1 md:py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg">
+      <div className="flex items-center gap-1 md:gap-3 flex-shrink-0">
+        <div className="flex items-center gap-1 md:gap-2 px-1 md:px-3 py-1 md:py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg">
           <div className="flex items-center gap-1">
-            <span className="hidden xs:inline text-[10px] font-bold text-slate-400 uppercase">De:</span>
+            <span className="hidden sm:inline text-[10px] font-bold text-slate-400 uppercase">De:</span>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="bg-transparent text-[10px] md:text-xs font-bold text-deluna-primary outline-none focus:ring-0 border-none cursor-pointer p-0 w-[90px] md:w-auto"
+              className="bg-transparent text-[9px] tiny:text-[10px] md:text-xs font-bold text-deluna-primary outline-none focus:ring-0 border-none cursor-pointer p-0 w-[80px] tiny:w-[90px] md:w-auto"
             />
           </div>
           <div className="w-[1px] h-4 bg-slate-200 mx-0.5 md:mx-1"></div>
           <div className="flex items-center gap-1">
-            <span className="hidden xs:inline text-[10px] font-bold text-slate-400 uppercase">Até:</span>
+            <span className="hidden sm:inline text-[10px] font-bold text-slate-400 uppercase">Até:</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="bg-transparent text-[10px] md:text-xs font-bold text-deluna-primary outline-none focus:ring-0 border-none cursor-pointer p-0 w-[90px] md:w-auto"
+              className="bg-transparent text-[9px] tiny:text-[10px] md:text-xs font-bold text-deluna-primary outline-none focus:ring-0 border-none cursor-pointer p-0 w-[80px] tiny:w-[90px] md:w-auto"
             />
           </div>
         </div>
-        <div className="flex items-center gap-1.5 md:gap-3 flex-shrink-0">
+        <div className="flex items-center gap-1 md:gap-3 flex-shrink-0">
           {/* Botão de Refresh Manual */}
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
             title="Atualizar dados da planilha"
-            className={`flex items-center justify-center rounded-xl h-10 w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-slate-50 transition-all shadow-sm ${isRefreshing ? 'opacity-50' : ''}`}
+            className={`flex items-center justify-center rounded-xl h-8 w-8 md:h-10 md:w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-slate-50 transition-all shadow-sm ${isRefreshing ? 'opacity-50' : ''}`}
           >
-            <span className={`material-symbols-outlined text-[20px] ${isRefreshing ? 'animate-spin' : ''}`}>
+            <span className={`material-symbols-outlined text-[18px] md:text-[20px] ${isRefreshing ? 'animate-spin' : ''}`}>
               sync
             </span>
-          </button>
-
-          <button
-            title="Notificações"
-            className="hidden xs:flex items-center justify-center rounded-xl h-10 w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-slate-50 shadow-sm"
-          >
-            <span className="material-symbols-outlined text-[20px]">notifications</span>
-          </button>
-
-          <button
-            title="Configurações"
-            className="hidden xs:flex items-center justify-center rounded-xl h-10 w-10 border border-[#E2E8F0] text-deluna-primary hover:bg-slate-50 shadow-sm"
-          >
-            <span className="material-symbols-outlined text-[20px]">settings</span>
           </button>
         </div>
       </div>
