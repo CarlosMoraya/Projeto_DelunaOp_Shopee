@@ -28,6 +28,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
   const [metasData, setMetasData] = useState<MetaGoalData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCoordinator, setSelectedCoordinator] = useState<string>('');
+  const [showOnlyPending, setShowOnlyPending] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -286,16 +287,26 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
       });
     });
 
-    return result.sort((a, b) => a.base.localeCompare(b.base));
-  }, [currentPeriodData, previousPeriodData, qlpCounts, metasData, startDate, endDate]);
+    // Filtrar por pendentes se solicitado
+    let finalResult = result;
+    if (showOnlyPending) {
+      finalResult = result.filter(item => item.pending > 0);
+    }
+
+    return finalResult.sort((a, b) => a.base.localeCompare(b.base));
+  }, [currentPeriodData, previousPeriodData, qlpCounts, metasData, startDate, endDate, showOnlyPending]);
 
   // Calcular totais gerais
   const totals = useMemo(() => {
     if (baseMetrics.length === 0) return null;
 
-    // Agregar dados diários globais
+    const visibleBases = new Set(baseMetrics.map(b => b.base));
+
+    // Agregar dados diários globais (apenas para bases visíveis)
     const dailyGlobalMap = new Map<string, Set<string>>();
     currentPeriodData.forEach(row => {
+      if (!visibleBases.has(row.hub)) return;
+
       const dayKey = row.date;
       const daySet = dailyGlobalMap.get(dayKey) || new Set<string>();
       if (row.atCode && row.atCode !== '') {
@@ -361,19 +372,37 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
           </p>
         </div>
 
-        {/* Filtro por Coordenador */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-bold text-slate-500 uppercase">Coordenador:</label>
-          <select
-            value={selectedCoordinator}
-            onChange={(e) => setSelectedCoordinator(e.target.value)}
-            className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-deluna-primary outline-none focus:ring-2 focus:ring-deluna-primary/20"
-          >
-            <option value="">Todos</option>
-            {coordinators.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          {/* Filtro por Coordenador */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-bold text-slate-500 uppercase">Coordenador:</label>
+            <select
+              value={selectedCoordinator}
+              onChange={(e) => setSelectedCoordinator(e.target.value)}
+              className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-deluna-primary outline-none focus:ring-2 focus:ring-deluna-primary/20"
+            >
+              <option value="">Todos</option>
+              {coordinators.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro por Pendentes */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-bold text-slate-500 uppercase">Exibir:</label>
+            <select
+              value={showOnlyPending ? 'pending' : 'all'}
+              onChange={(e) => setShowOnlyPending(e.target.value === 'pending')}
+              className={`px-3 py-2 bg-white border rounded-lg text-sm font-bold outline-none transition-all focus:ring-2 ${showOnlyPending
+                ? 'border-red-200 text-red-600 focus:ring-red-500/20'
+                : 'border-slate-200 text-deluna-primary focus:ring-deluna-primary/20'
+                }`}
+            >
+              <option value="all">Todas as Bases</option>
+              <option value="pending">Somente Pendentes (!)</option>
+            </select>
+          </div>
         </div>
       </div>
 
