@@ -9,9 +9,7 @@ const QLPManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Filtros
-  const [filterCnh, setFilterCnh] = useState<string>('');
-  const [filterMotorista, setFilterMotorista] = useState<string>('');
-  const [filterGr, setFilterGr] = useState<string>('');
+  const [filterSituacao, setFilterSituacao] = useState<string>('');
   const [filterCoordenador, setFilterCoordenador] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
@@ -39,37 +37,49 @@ const QLPManagement: React.FC = () => {
 
   const filteredData = useMemo(() => {
     return allData.filter(row => {
-      const matchCnh = !filterCnh || row.situacaoCnh.toUpperCase() === filterCnh.toUpperCase();
-      const matchMotorista = !filterMotorista || row.situacaoMotorista.toUpperCase() === filterMotorista.toUpperCase();
-      const matchGr = !filterGr || row.situacaoGrPlaca.toUpperCase() === filterGr.toUpperCase();
+      const isApto = (status: string) => {
+        const s = (status || '').toUpperCase().trim();
+        return s === 'APTO' || (s.includes('APTO') && !s.includes('INAPTO'));
+      };
+
+      const rowIsApto = isApto(row.situacaoCnh) && isApto(row.situacaoMotorista) && isApto(row.situacaoGrPlaca);
+      const isAtivo = (row.statusQlp || '').toUpperCase().trim() === 'ATIVO';
+
+      let matchSituacao = true;
+      if (filterSituacao === 'ATIVO_APTO') matchSituacao = isAtivo && rowIsApto;
+      else if (filterSituacao === 'ATIVO_PENDENTE') matchSituacao = isAtivo && !rowIsApto;
+      else if (filterSituacao === 'INATIVO') matchSituacao = !isAtivo;
+
       const matchCoordenador = !filterCoordenador || row.coordenador.toUpperCase() === filterCoordenador.toUpperCase();
       const matchSearch = !searchTerm ||
         row.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.base.toLowerCase().includes(searchTerm.toLowerCase());
 
-      return matchCnh && matchMotorista && matchGr && matchCoordenador && matchSearch;
+      return matchSituacao && matchCoordenador && matchSearch;
     });
-  }, [allData, filterCnh, filterMotorista, filterGr, filterCoordenador, searchTerm]);
+  }, [allData, filterSituacao, filterCoordenador, searchTerm]);
 
   const stats = useMemo(() => {
-    const total = filteredData.length;
+    const ativos = filteredData.filter(r => (r.statusQlp || '').toUpperCase().trim() === 'ATIVO');
+    const inativos = filteredData.filter(r => (r.statusQlp || '').toUpperCase().trim() === 'INATIVO').length;
 
     const isApto = (status: string) => {
-      const s = status.toUpperCase().trim();
+      const s = (status || '').toUpperCase().trim();
       return s === 'APTO' || (s.includes('APTO') && !s.includes('INAPTO'));
     };
 
-    const totalApto = filteredData.filter(r =>
+    const totalAptoAtivo = ativos.filter(r =>
       isApto(r.situacaoCnh) &&
       isApto(r.situacaoMotorista) &&
       isApto(r.situacaoGrPlaca)
     ).length;
 
     return {
-      total,
-      aptos: totalApto,
-      inaptos: total - totalApto
+      totalAtivos: ativos.length,
+      totalInativos: inativos,
+      aptosAtivos: totalAptoAtivo,
+      inaptosAtivos: ativos.length - totalAptoAtivo
     };
   }, [filteredData]);
 
@@ -115,35 +125,44 @@ const QLPManagement: React.FC = () => {
       </div>
 
       {/* Visões Gerais */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <SummaryCard
-          title="Total Filtrado"
-          value={stats.total.toLocaleString('pt-BR')}
+          title="Total Ativos"
+          value={stats.totalAtivos.toLocaleString('pt-BR')}
           icon="groups"
           color="text-deluna-primary"
           bg="bg-slate-100"
+          sub="Motoristas com status Ativo"
         />
         <SummaryCard
-          title="Aptos (Total)"
-          value={stats.aptos.toLocaleString('pt-BR')}
+          title="Total Inativos"
+          value={stats.totalInativos.toLocaleString('pt-BR')}
+          icon="person_off"
+          color="text-slate-500"
+          bg="bg-slate-50"
+          sub="Motoristas com status Inativo"
+        />
+        <SummaryCard
+          title="Aptos (Ativos)"
+          value={stats.aptosAtivos.toLocaleString('pt-BR')}
           icon="verified"
           color="text-green-600"
           bg="bg-green-50"
-          sub="Apto em todos os critérios"
+          sub="Ativos sem pendências"
         />
         <SummaryCard
           title="Inaptos / Pendentes"
-          value={stats.inaptos.toLocaleString('pt-BR')}
+          value={stats.inaptosAtivos.toLocaleString('pt-BR')}
           icon="dangerous"
           color="text-red-600"
           bg="bg-red-50"
-          sub="Possui pelo menos um critério inativo"
+          sub="Ativos com alguma pendência"
         />
       </div>
 
       {/* Barra de Filtros */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
-        <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+        <div className="flex flex-col gap-1 flex-1 min-w-[220px]">
           <label className="text-[10px] font-black uppercase text-slate-400">Buscar (Nome, Placa, Hub)</label>
           <input
             type="text"
@@ -154,43 +173,21 @@ const QLPManagement: React.FC = () => {
           />
         </div>
 
-        <div className="flex flex-col gap-1 min-w-[150px]">
-          <label className="text-[10px] font-black uppercase text-slate-400">Situação CNH</label>
+        <div className="flex flex-col gap-1 flex-[1.5] min-w-[280px]">
+          <label className="text-[10px] font-black uppercase text-slate-400">Situação / Conformidade</label>
           <select
-            value={filterCnh}
-            onChange={(e) => setFilterCnh(e.target.value)}
-            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-deluna-primary/20 outline-none"
+            value={filterSituacao}
+            onChange={(e) => setFilterSituacao(e.target.value)}
+            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-deluna-primary/20 outline-none w-full"
           >
-            <option value="">TODOS</option>
-            {cnhOptions.map(opt => <option key={opt} value={opt}>{opt.toUpperCase()}</option>)}
+            <option value="">TODOS (ATIVOS + INATIVOS)</option>
+            <option value="ATIVO_APTO">ATIVOS - APTOS</option>
+            <option value="ATIVO_PENDENTE">ATIVOS - COM PENDÊNCIA</option>
+            <option value="INATIVO">INATIVOS</option>
           </select>
         </div>
 
-        <div className="flex flex-col gap-1 min-w-[150px]">
-          <label className="text-[10px] font-black uppercase text-slate-400">Situação Motorista</label>
-          <select
-            value={filterMotorista}
-            onChange={(e) => setFilterMotorista(e.target.value)}
-            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-deluna-primary/20 outline-none"
-          >
-            <option value="">TODOS</option>
-            {motoristaOptions.map(opt => <option key={opt} value={opt}>{opt.toUpperCase()}</option>)}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-1 min-w-[150px]">
-          <label className="text-[10px] font-black uppercase text-slate-400">Situação GR</label>
-          <select
-            value={filterGr}
-            onChange={(e) => setFilterGr(e.target.value)}
-            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-deluna-primary/20 outline-none"
-          >
-            <option value="">TODOS</option>
-            {grOptions.map(opt => <option key={opt} value={opt}>{opt.toUpperCase()}</option>)}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-1 min-w-[150px]">
+        <div className="flex flex-col gap-1 min-w-[180px]">
           <label className="text-[10px] font-black uppercase text-slate-400">Coordenador</label>
           <select
             value={filterCoordenador}
@@ -204,9 +201,7 @@ const QLPManagement: React.FC = () => {
 
         <button
           onClick={() => {
-            setFilterCnh('');
-            setFilterMotorista('');
-            setFilterGr('');
+            setFilterSituacao('');
             setFilterCoordenador('');
             setSearchTerm('');
           }}

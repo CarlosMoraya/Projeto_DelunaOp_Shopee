@@ -376,7 +376,8 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
                     tipoVeiculo: String(getVal(row, 'TIPO DO VEÍCULO', 'TIPO VEICULO') || ''),
                     situacaoGrPlaca: String(getVal(row, 'SITUAÇÃO GR PLACA', 'GR PLACA') || ''),
                     cliente: String(getVal(row, 'Q CLENTE', 'CLIENTE') || ''),
-                    coordenador: metadata ? metadata.coord : ''
+                    coordenador: metadata ? metadata.coord : '',
+                    statusQlp: String(getVal(row, 'STATUS QLP', 'SITUAÇÃO QLP', 'STATUS_QLP') || '')
                 };
             });
 

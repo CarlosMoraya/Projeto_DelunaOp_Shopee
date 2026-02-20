@@ -88,6 +88,7 @@ export interface QLPData {
   situacaoGrPlaca: string;
   cliente: string;
   coordenador: string;
+  statusQlp: string;
 }
 
 export interface MetaGoalData {
