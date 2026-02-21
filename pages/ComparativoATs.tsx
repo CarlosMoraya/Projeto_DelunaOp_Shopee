@@ -114,9 +114,11 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     const normalizeBase = (s: string) => String(s || '').toUpperCase().replace(/[\s_|-]/g, '').replace(/^LAJ/, 'LRJ');
 
     qlpData.forEach(row => {
-      const normalizedBase = normalizeBase(row.base);
-      if (normalizedBase) {
-        counts.set(normalizedBase, (counts.get(normalizedBase) || 0) + 1);
+      if ((row.statusQlp || '').toUpperCase().trim() === 'ATIVO') {
+        const normalizedBase = normalizeBase(row.base);
+        if (normalizedBase) {
+          counts.set(normalizedBase, (counts.get(normalizedBase) || 0) + 1);
+        }
       }
     });
     return counts;
