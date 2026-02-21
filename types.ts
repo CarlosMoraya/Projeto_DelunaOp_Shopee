@@ -89,6 +89,8 @@ export interface QLPData {
   cliente: string;
   coordenador: string;
   statusQlp: string;
+  nomeId?: string;
+  ultimaViagem?: string;
 }
 
 export interface MetaGoalData {

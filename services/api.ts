@@ -129,7 +129,7 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
 
                 return {
                     date: formattedDate,
-                    id: String(getVal(row, 'ID') || 'S/ID'),
+                    id: String(getVal(row, 'Nome Id', 'NOME ID', 'ID') || 'S/ID').trim(),
                     driver: String(getVal(row, 'Motorista', 'DRIVER') || 'S/M'),
                     hub: String(getVal(row, 'Bases', 'BASE', 'HUB') || 'S/H'),
                     coordinator: String(getVal(row, 'Coordenador', 'COORD', 'SUPERVISOR') || 'S/C'),
@@ -366,18 +366,20 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
                 const baseName = String(getVal(row, 'BASE') || '');
                 const normalizedBaseName = normalizeBase(baseName);
                 const metadata = metadataMap.get(normalizedBaseName);
+                const nomeId = String(getVal(row, 'NOME ID', 'ID') || '').trim();
 
                 return {
                     base: baseName,
                     placa: String(getVal(row, 'PLACA') || ''),
-                    nome: String(getVal(row, 'NOME') || ''),
+                    nome: String(getVal(row, 'NOME', 'NOME DO MOTORISTA', 'MOTORISTA') || nomeId || ''),
                     situacaoCnh: String(getVal(row, 'SITUAÇÃO CNH', 'CNH') || ''),
                     situacaoMotorista: String(getVal(row, 'SITUAÇÃO MOTORISTA', 'MOTORISTA') || ''),
                     tipoVeiculo: String(getVal(row, 'TIPO DO VEÍCULO', 'TIPO VEICULO') || ''),
                     situacaoGrPlaca: String(getVal(row, 'SITUAÇÃO GR PLACA', 'GR PLACA') || ''),
                     cliente: String(getVal(row, 'Q CLENTE', 'CLIENTE') || ''),
                     coordenador: metadata ? metadata.coord : '',
-                    statusQlp: String(getVal(row, 'STATUS QLP', 'SITUAÇÃO QLP', 'STATUS_QLP') || '')
+                    statusQlp: String(getVal(row, 'STATUS QLP', 'SITUAÇÃO QLP', 'STATUS_QLP') || ''),
+                    nomeId
                 };
             });
 
