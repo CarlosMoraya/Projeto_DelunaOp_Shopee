@@ -11,6 +11,7 @@ import ComparativoATs from './pages/ComparativoATs';
 import PNRStuck from './pages/PNRStuck';
 import Login from './pages/Login';
 import VirtualBank from './pages/VirtualBank';
+import Monitoramento from './pages/Monitoramento';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DELIVERY_SUCCESS);
@@ -111,6 +112,8 @@ const App: React.FC = () => {
         return <PNRStuck startDate={startDate} endDate={endDate} />;
       case AppView.BANCO_VIRTUAL:
         return <VirtualBank startDate={startDate} endDate={endDate} />;
+      case AppView.MONITORAMENTO:
+        return <Monitoramento />;
       default:
         return <DeliverySuccess />;
     }

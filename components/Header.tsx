@@ -74,6 +74,7 @@ const Header: React.FC<HeaderProps> = ({
       case AppView.PNR_STUCK: return <>Gestão de PNR <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão Logística</span></>;
       case AppView.LEADERBOARD: return <>Campanha Acelera + 30 <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Base</span></>;
       case AppView.BANCO_VIRTUAL: return <>Banco Virtual <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Acumulado de Ganhos</span></>;
+      case AppView.MONITORAMENTO: return <>Monitoramento Geográfico <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Tempo Real</span></>;
     }
   };
 

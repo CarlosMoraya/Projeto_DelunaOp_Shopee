@@ -17,6 +17,15 @@ This file records key technical decisions, major features, and architectural cha
     - Data: Fetching images and scores directly from Google Sheets integration.
 - **Cross-Page Filters**: Syncing "Active QLP" data across `Comparativo.tsx` and `ComparativoATs.tsx`.
 
+## [2026-02-28] New Feature: Monitoramento (Live View)
+- **Objective**: Provide a real-time monitoring dashboard for the Shopee operation.
+- **Data Source**: New tab `Monitoramento` in Google Sheets.
+- **Key Components**:
+    - Total Cards: Assigned, Delivered (#/%), On-hold, Drivers Count.
+    - Charts: Delivery Rate per Station (Top 10) and General Progress (Pie Chart).
+    - Detailed Table: Granular view with status indicators and search filter.
+- **Technical Decision**: Leveraged `fetchBaseMetadata` to integrate coordinator info into the monitoring data.
+
 ## Technical Standards
 - **Global State**: Navigation via `currentView` in `App.tsx`.
 - **Data Source**: Deep integration with Google Sheets via custom API services.

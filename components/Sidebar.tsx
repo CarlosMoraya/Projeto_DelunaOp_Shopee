@@ -15,6 +15,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpen, onClose, userEmail, userName, onLogout }) => {
   const menuItems = [
     { id: AppView.DELIVERY_SUCCESS, icon: 'dashboard', label: 'Delivery Success' },
+    { id: AppView.MONITORAMENTO, icon: 'monitor_heart', label: 'Monitoramento' },
     { id: AppView.COMPARATIVO, icon: 'compare_arrows', label: 'Comparativo DS' },
     { id: AppView.COMPARATIVO_ATS, icon: 'bar_chart', label: 'Comparativo ATs' },
     { id: AppView.QLP_MANAGEMENT, icon: 'analytics', label: 'QLP Atual' },

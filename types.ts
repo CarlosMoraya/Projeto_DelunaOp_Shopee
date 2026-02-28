@@ -7,7 +7,8 @@ export enum AppView {
   COMPARATIVO = 'comparativo',
   COMPARATIVO_ATS = 'comparativo_ats',
   PNR_STUCK = 'pnr_stuck',
-  BANCO_VIRTUAL = 'banco_virtual'
+  BANCO_VIRTUAL = 'banco_virtual',
+  MONITORAMENTO = 'monitoramento'
 }
 
 export interface MetricCardProps {
@@ -179,4 +180,19 @@ export interface VirtualBankData {
   meta_alcancada: boolean;
   status_texto: string;
   data_referencia: string;
+}
+
+export interface MonitoramentoData {
+  driverName: string;
+  driverStation: string;
+  baseId: string;
+  localidade: string;
+  assigned: number;
+  deliveryProgress: string; // Ex: "50%" ou "10/20"
+  deliveredCount: number;
+  deliveredPercentage: number;
+  onHold: number;
+  assignedTime: string;
+  timeSinceLastDelivery: string;
+  coordinator?: string;
 }

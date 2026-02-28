@@ -1,5 +1,5 @@
 
-import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow, AccessData, MetaPerdasData, VirtualBankData } from '../types';
+import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow, AccessData, MetaPerdasData, VirtualBankData, MonitoramentoData } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
@@ -13,6 +13,7 @@ const METAS_PROTAGONISMO_CACHE_KEY = 'metas_protagonismo_data_cache_v1';
 const ACESSOS_CACHE_KEY = 'acessos_data_cache_v1';
 const PNR_CACHE_KEY = 'pnr_data_cache_v4';
 const METAS_PERDAS_CACHE_KEY = 'metas_perdas_data_cache_v1';
+const MONITORAMENTO_CACHE_KEY = 'monitoramento_data_cache_v1';
 const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 horas
 
 /**
@@ -28,6 +29,7 @@ export const clearApiCache = () => {
     localStorage.removeItem(ACESSOS_CACHE_KEY);
     localStorage.removeItem(PNR_CACHE_KEY);
     localStorage.removeItem(METAS_PERDAS_CACHE_KEY);
+    localStorage.removeItem(MONITORAMENTO_CACHE_KEY);
     console.log("Caches limpos com sucesso!");
 };
 
@@ -165,7 +167,7 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
     }
 };
 
-const fetchBaseMetadata = async (url: string = GOOGLE_SCRIPT_URL): Promise<{ metadataMap: Map<string, { coord: string; lider: string; localidade: string }>; normalizeBase: (s: string) => string }> => {
+const fetchBaseMetadata = async (url: string = GOOGLE_SCRIPT_URL): Promise<{ metadataMap: Map<string, { coord: string; lider: string; localidade: string; baseId: string }>; normalizeBase: (s: string) => string }> => {
     try {
         const response = await fetch(`${url}?tab=${encodeURIComponent('Lista de Bases')}`);
         if (!response.ok) return { metadataMap: new Map(), normalizeBase: (s: string) => s };
@@ -176,15 +178,16 @@ const fetchBaseMetadata = async (url: string = GOOGLE_SCRIPT_URL): Promise<{ met
         const normalizeBase = (s: string) => String(s || '').toUpperCase().replace(/[\s_|-]/g, '').replace(/^LAJ/, 'LRJ');
 
         rawBases.forEach(row => {
-            const rawBase = String(getVal(row, 'BASES', 'BASE') || '');
-            const normalizedBase = normalizeBase(rawBase);
-            if (normalizedBase) {
-                metadataMap.set(normalizedBase, {
-                    coord: String(getVal(row, 'Supervisor | Coordenador', 'SUP / COORD', 'SUP/COORD', 'COORDENADOR', 'COORD', 'SUPERVISOR') || ''),
-                    lider: String(getVal(row, 'LÍDER ATUAL', 'LIDER ATUAL', 'LÍDER', 'LIDER', 'LEADER') || ''),
-                    localidade: String(getVal(row, 'LOCALIDADE', 'LOCAL', 'CIDADE', 'HUB') || '')
-                });
-            }
+            const rawBase = String(getVal(row, 'Bases', 'BASE', 'Bases') || '');
+            const rawHub = String(getVal(row, 'Hub', 'HUB', 'HUB_NAME') || '');
+            const coord = String(getVal(row, 'Supervisor | Coordenador', 'SUP / COORD', 'SUP/COORD', 'COORDENADOR', 'COORD', 'SUPERVISOR') || '');
+            const lider = String(getVal(row, 'LÍDER ATUAL', 'LIDER ATUAL', 'LÍDER', 'LIDER', 'LEADER', 'Lider') || '');
+            const localidade = String(getVal(row, 'LOCALIDADE', 'LOCAL', 'CIDADE', 'HUB') || '');
+
+            const baseMetadata = { coord, lider, localidade, baseId: rawBase };
+
+            if (rawBase) metadataMap.set(normalizeBase(rawBase), baseMetadata);
+            if (rawHub) metadataMap.set(normalizeBase(rawHub), baseMetadata);
         });
         return { metadataMap, normalizeBase };
     } catch (error) {
@@ -684,4 +687,71 @@ const getMockBankData = (): VirtualBankData[] => {
         { base: 'EXEMPLO RJ', coordinator: 'COORD 1', lider: 'LIDER A', atualmente_acumulado: 1250.50, previsao_bonus: 500, qtde_meses: 2, meta_alcancada: true, status_texto: 'Alcançada', data_referencia: '2026-02-01' },
         { base: 'EXEMPLO SP', coordinator: 'COORD 2', lider: 'LIDER B', atualmente_acumulado: 800.00, previsao_bonus: 300, qtde_meses: 1, meta_alcancada: false, status_texto: 'Pendente', data_referencia: '2026-02-01' },
     ];
+};
+
+export const fetchMonitoramentoData = async (url: string = GOOGLE_SCRIPT_URL): Promise<MonitoramentoData[]> => {
+    try {
+        const cached = localStorage.getItem(MONITORAMENTO_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                return data;
+            }
+        }
+
+        const response = await fetch(`${url}?tab=Monitoramento`);
+        if (!response.ok) throw new Error(`Erro na API Monitoramento: ${response.statusText}`);
+
+        const rawData: any[] = await response.json();
+
+        // Também pegamos metadados de bases para trazer o coordenador se possível
+        const { metadataMap, normalizeBase } = await fetchBaseMetadata(url);
+
+        const processed = rawData
+            .filter(row => getVal(row, 'Driver Name', 'Driver') !== '')
+            .map(row => {
+                const station = String(getVal(row, 'Driver station', 'Station', 'Base', 'Hub') || '').trim();
+                const normalizedStation = normalizeBase(station);
+                const metadata = metadataMap.get(normalizedStation);
+
+                // Captura de valores com fallbacks e tratamento para não retornar NaN
+                const assigned = parseNum(getVal(row, 'Assigned', 'Remessas', 'Qtd AT')) || 0;
+
+                // Mapeamento específico para caracteres especiais (fullwidth parentheses) usados nos relatórios da Shopee
+                const deliveredCount = parseNum(getVal(row, 'Delivered（#）', 'Delivered(#)', 'Delivered (#)', 'Entregues', 'Entregue', 'Qtd Entregue', 'Delivered')) || 0;
+
+                // Se a porcentagem vir como 0.95 (95%), o parseNum lida. Se vir como NaN, calculamos manualmente
+                let deliveredPercentage = parseNum(getVal(row, 'Delivered（%）', 'Delivered(%)', 'Delivered (%)', 'Taxa Sucesso', 'Performance', '% Entregue'));
+                if (isNaN(deliveredPercentage) && assigned > 0) {
+                    deliveredPercentage = Math.round((deliveredCount / assigned) * 1000) / 10;
+                } else if (isNaN(deliveredPercentage)) {
+                    deliveredPercentage = 0;
+                }
+
+                return {
+                    driverName: String(getVal(row, 'Driver Name', 'Driver', 'Motorista') || 'S/M'),
+                    driverStation: station,
+                    baseId: metadata ? metadata.baseId : '',
+                    localidade: metadata ? metadata.localidade : '',
+                    assigned: assigned,
+                    deliveryProgress: String(getVal(row, 'Delivery Progress', 'Progresso', 'Status Entrega') || (assigned > 0 ? `${Math.round((deliveredCount / assigned) * 100)}%` : '0%')),
+                    deliveredCount: deliveredCount,
+                    deliveredPercentage: deliveredPercentage,
+                    onHold: parseNum(getVal(row, 'On-hold', 'Pendentes', 'Em espera', 'OnHold')) || 0,
+                    assignedTime: String(getVal(row, 'Assigned Time', 'Hora Atribuição', 'Assigned_Time') || ''),
+                    timeSinceLastDelivery: String(getVal(row, 'Time Since Last delivery', 'Tempo Ultima Entrega', 'Last_Delivery') || ''),
+                    coordinator: metadata ? metadata.coord : ''
+                };
+            });
+
+        localStorage.setItem(MONITORAMENTO_CACHE_KEY, JSON.stringify({
+            data: processed,
+            timestamp: Date.now()
+        }));
+
+        return processed;
+    } catch (error) {
+        console.error("Erro ao carregar Monitoramento:", error);
+        return [];
+    }
 };
