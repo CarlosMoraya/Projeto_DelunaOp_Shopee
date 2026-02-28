@@ -4,6 +4,19 @@ import { QLPData } from '../types';
 import { fetchQLPData, fetchDeliveryData } from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
+const checkVehicleType = (tipoVeiculo: string | undefined, filter: string) => {
+  if (!filter) return true;
+  const t = (tipoVeiculo || '').toUpperCase().trim();
+  if (filter === 'PASSEIO') return t.includes('PASSEIO');
+  if (filter === 'UTILITÁRIO') return t.includes('UTILITARIO') || t.includes('UTILITÁRIO');
+  if (filter === 'VAN') return t.includes('VAN');
+  if (filter === 'VUC') return t.includes('VUC');
+  if (filter === 'OUTROS') {
+    return !t.includes('PASSEIO') && !t.includes('UTILITARIO') && !t.includes('UTILITÁRIO') && !t.includes('VAN') && !t.includes('VUC');
+  }
+  return t.includes(filter);
+};
+
 const QLPManagement: React.FC = () => {
   const [allData, setAllData] = useState<QLPData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -12,6 +25,8 @@ const QLPManagement: React.FC = () => {
   // Filtros
   const [filterSituacao, setFilterSituacao] = useState<string>('');
   const [filterCoordenador, setFilterCoordenador] = useState<string>('');
+  const [filterTipoVeiculo, setFilterTipoVeiculo] = useState<string>(''); // Novo filtro
+  const [filterBase, setFilterBase] = useState<string>(''); // Novo filtro
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Ordenação
@@ -98,14 +113,19 @@ const QLPManagement: React.FC = () => {
       else if (filterSituacao === 'INATIVO') matchSituacao = !isAtivo;
 
       const matchCoordenador = !filterCoordenador || row.coordenador.toUpperCase() === filterCoordenador.toUpperCase();
+
+      // Novos matches para os gráficos
+      const matchTipoVeiculo = checkVehicleType(row.tipoVeiculo, filterTipoVeiculo);
+      const matchBase = !filterBase || (row.base || '').toUpperCase() === filterBase.toUpperCase();
+
       const matchSearch = !searchTerm ||
         row.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
         row.base.toLowerCase().includes(searchTerm.toLowerCase());
 
-      return matchSituacao && matchCoordenador && matchSearch;
+      return matchSituacao && matchCoordenador && matchTipoVeiculo && matchBase && matchSearch;
     });
-  }, [allData, filterSituacao, filterCoordenador, searchTerm]);
+  }, [allData, filterSituacao, filterCoordenador, filterTipoVeiculo, filterBase, searchTerm]);
 
   const sortedData = useMemo(() => {
     if (!sortConfig.key) return filteredData;
@@ -145,13 +165,48 @@ const QLPManagement: React.FC = () => {
 
   // Dados do Gráfico de Veículos
   const vehicleChartData = useMemo(() => {
+    // Para o gráfico de veículos, queremos ver a distribuição do que já está filtrado (exceto pelo próprio filtro de veículo para não zerar as outras fatias se uma for selecionada, ou talvez manter consistente)
+    // Decisão: Usar os dados filtrados pelos OUTROS filtros para calcular os totais do gráfico.
+    const dataForVehicleChart = allData.filter(row => {
+      const isApto = (status: string) => {
+        const s = (status || '').toUpperCase().trim();
+        return s === 'APTO' || (s.includes('APTO') && !s.includes('INAPTO'));
+      };
+      const rowIsApto = isApto(row.situacaoCnh) && isApto(row.situacaoMotorista) && isApto(row.situacaoGrPlaca);
+      const isAtivo = (row.statusQlp || '').toUpperCase().trim() === 'ATIVO';
+
+      const isSemAtividade7d = (() => {
+        if (!row.ultimaViagem) return true;
+        const lastDate = new Date(row.ultimaViagem + 'T12:00:00');
+        const diffTime = Math.abs(new Date().getTime() - lastDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays > 7;
+      })();
+
+      let matchSituacao = true;
+      if (filterSituacao === 'ATIVO_APTO') matchSituacao = isAtivo && rowIsApto;
+      else if (filterSituacao === 'ATIVO_PENDENTE') matchSituacao = isAtivo && !rowIsApto;
+      else if (filterSituacao === 'ATIVO_INATIVO_7D') matchSituacao = isAtivo && isSemAtividade7d;
+      else if (filterSituacao === 'ATIVO_SEM_ATIVIDADE') matchSituacao = isAtivo && !row.ultimaViagem;
+      else if (filterSituacao === 'INATIVO') matchSituacao = !isAtivo;
+
+      const matchCoordenador = !filterCoordenador || row.coordenador.toUpperCase() === filterCoordenador.toUpperCase();
+      const matchBase = !filterBase || (row.base || '').toUpperCase() === filterBase.toUpperCase();
+      const matchSearch = !searchTerm ||
+        row.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.base.toLowerCase().includes(searchTerm.toLowerCase());
+
+      return matchSituacao && matchCoordenador && matchBase && matchSearch;
+    });
+
     let passeio = 0;
     let utilitario = 0;
     let van = 0;
     let vuc = 0;
     let outros = 0;
 
-    filteredData.forEach(row => {
+    dataForVehicleChart.forEach(row => {
       const type = (row.tipoVeiculo || '').toUpperCase().trim();
       if (type.includes('PASSEIO')) passeio++;
       else if (type.includes('UTILITARIO') || type.includes('UTILITÁRIO')) utilitario++;
@@ -161,27 +216,61 @@ const QLPManagement: React.FC = () => {
     });
 
     return [
-      { name: 'Passeio', value: passeio, color: '#3b82f6' }, // blue-500
-      { name: 'Utilitário', value: utilitario, color: '#10b981' }, // emerald-500
-      { name: 'Van', value: van, color: '#f59e0b' }, // amber-500
-      { name: 'VUC', value: vuc, color: '#8b5cf6' }, // violet-500
-      { name: 'Outros', value: outros, color: '#94a3b8' }, // slate-400
-    ].filter(item => item.value > 0); // Remove os que tiverem zero para não poluir o gráfico
-  }, [filteredData]);
+      { name: 'Passeio', value: passeio, color: '#3b82f6' },
+      { name: 'Utilitário', value: utilitario, color: '#10b981' },
+      { name: 'Van', value: van, color: '#f59e0b' },
+      { name: 'VUC', value: vuc, color: '#8b5cf6' },
+      { name: 'Outros', value: outros, color: '#94a3b8' },
+    ].filter(item => item.value > 0);
+  }, [allData, filterSituacao, filterCoordenador, filterBase, searchTerm]);
 
   // Dados do Gráfico de Veículos por Base
   const baseChartData = useMemo(() => {
+    // Para o gráfico de bases, usamos dados filtrados pelos outros filtros
+    const dataForBaseChart = allData.filter(row => {
+      const isApto = (status: string) => {
+        const s = (status || '').toUpperCase().trim();
+        return s === 'APTO' || (s.includes('APTO') && !s.includes('INAPTO'));
+      };
+      const rowIsApto = isApto(row.situacaoCnh) && isApto(row.situacaoMotorista) && isApto(row.situacaoGrPlaca);
+      const isAtivo = (row.statusQlp || '').toUpperCase().trim() === 'ATIVO';
+
+      const isSemAtividade7d = (() => {
+        if (!row.ultimaViagem) return true;
+        const lastDate = new Date(row.ultimaViagem + 'T12:00:00');
+        const diffTime = Math.abs(new Date().getTime() - lastDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays > 7;
+      })();
+
+      let matchSituacao = true;
+      if (filterSituacao === 'ATIVO_APTO') matchSituacao = isAtivo && rowIsApto;
+      else if (filterSituacao === 'ATIVO_PENDENTE') matchSituacao = isAtivo && !rowIsApto;
+      else if (filterSituacao === 'ATIVO_INATIVO_7D') matchSituacao = isAtivo && isSemAtividade7d;
+      else if (filterSituacao === 'ATIVO_SEM_ATIVIDADE') matchSituacao = isAtivo && !row.ultimaViagem;
+      else if (filterSituacao === 'INATIVO') matchSituacao = !isAtivo;
+
+      const matchCoordenador = !filterCoordenador || row.coordenador.toUpperCase() === filterCoordenador.toUpperCase();
+      const matchTipoVeiculo = checkVehicleType(row.tipoVeiculo, filterTipoVeiculo);
+      const matchSearch = !searchTerm ||
+        row.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.base.toLowerCase().includes(searchTerm.toLowerCase());
+
+      return matchSituacao && matchCoordenador && matchTipoVeiculo && matchSearch;
+    });
+
     const baseCounts = new Map<string, number>();
 
-    filteredData.forEach(row => {
+    dataForBaseChart.forEach(row => {
       const base = (row.base || 'SEM BASE').toUpperCase().trim();
       baseCounts.set(base, (baseCounts.get(base) || 0) + 1);
     });
 
     return Array.from(baseCounts.entries())
       .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value); // Ordena decrescente pela quantidade de veículos
-  }, [filteredData]);
+      .sort((a, b) => b.value - a.value);
+  }, [allData, filterSituacao, filterCoordenador, filterTipoVeiculo, searchTerm]);
 
   // Opções únicas para os selects (ordenadas e filtradas)
   const getOptions = (key: keyof QLPData) => {
@@ -269,10 +358,10 @@ const QLPManagement: React.FC = () => {
             <span className="material-symbols-outlined text-deluna-primary">local_shipping</span>
             <h2 className="text-sm font-black text-slate-700 uppercase tracking-widest">Tipos de Veículos</h2>
           </div>
-          <div className="flex-1 min-h-[250px] relative">
+          <div className="flex-1 min-h-[250px] relative [&_*:focus]:outline-none">
             {vehicleChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart style={{ outline: 'none' }}>
                   <Pie
                     data={vehicleChartData}
                     cx="50%"
@@ -282,9 +371,21 @@ const QLPManagement: React.FC = () => {
                     paddingAngle={5}
                     dataKey="value"
                     stroke="none"
+                    onClick={(data) => {
+                      if (data && data.name) {
+                        setFilterTipoVeiculo(prev => prev === data.name.toUpperCase() ? '' : data.name.toUpperCase());
+                      }
+                    }}
+                    cursor="pointer"
                   >
                     {vehicleChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.color}
+                        stroke={filterTipoVeiculo === entry.name.toUpperCase() ? '#1B4332' : 'none'}
+                        strokeWidth={2}
+                        opacity={!filterTipoVeiculo || filterTipoVeiculo === entry.name.toUpperCase() ? 1 : 0.3}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
@@ -295,7 +396,14 @@ const QLPManagement: React.FC = () => {
                     verticalAlign="bottom"
                     height={36}
                     iconType="circle"
-                    formatter={(value, entry: any) => <span className="text-[10px] font-bold text-slate-600">{value} ({entry.payload.value})</span>}
+                    onClick={(data: any) => {
+                      setFilterTipoVeiculo(prev => prev === data.value.toUpperCase() ? '' : data.value.toUpperCase());
+                    }}
+                    formatter={(value, entry: any) => (
+                      <span className={`text-[10px] font-bold cursor-pointer ${filterTipoVeiculo === value.toUpperCase() ? 'text-deluna-primary underline' : 'text-slate-600'}`}>
+                        {value} ({entry.payload.value})
+                      </span>
+                    )}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -314,17 +422,40 @@ const QLPManagement: React.FC = () => {
             <h2 className="text-sm font-black text-slate-700 uppercase tracking-widest">Total de Veículos por Base e Filtros da Tabela</h2>
           </div>
 
-          <div className="flex-1 w-full min-h-[160px] mb-2">
+          <div className="flex-1 w-full min-h-[160px] mb-2 [&_*:focus]:outline-none">
             {baseChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={baseChartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }} barSize={30}>
+                <BarChart
+                  data={baseChartData}
+                  style={{ outline: 'none' }}
+                  margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
+                  barSize={30}
+                  onClick={(data) => {
+                    if (data && data.activeLabel) {
+                      setFilterBase(prev => prev === data.activeLabel ? '' : data.activeLabel);
+                    }
+                  }}
+                >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }}
-                    dy={10}
+                    tick={(props: any) => (
+                      <text
+                        x={props.x}
+                        y={props.y}
+                        dy={10}
+                        fontSize={10}
+                        fill={filterBase === props.payload.value ? '#1B4332' : '#64748b'}
+                        fontWeight="bold"
+                        textAnchor="middle"
+                        className="cursor-pointer"
+                        onClick={() => setFilterBase(prev => prev === props.payload.value ? '' : props.payload.value)}
+                      >
+                        {props.payload.value}
+                      </text>
+                    )}
                   />
                   <YAxis
                     axisLine={false}
@@ -336,7 +467,20 @@ const QLPManagement: React.FC = () => {
                     formatter={(value: number) => [value, 'Veículos']}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   />
-                  <Bar dataKey="value" fill="#0f766e" radius={[4, 4, 0, 0]} />
+                  <Bar
+                    dataKey="value"
+                    fill="#0f766e"
+                    radius={[4, 4, 0, 0]}
+                    cursor="pointer"
+                  >
+                    {baseChartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-bar-${index}`}
+                        fill={filterBase === entry.name ? '#1B4332' : '#0f766e'}
+                        opacity={!filterBase || filterBase === entry.name ? 1 : 0.4}
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -390,6 +534,8 @@ const QLPManagement: React.FC = () => {
               onClick={() => {
                 setFilterSituacao('');
                 setFilterCoordenador('');
+                setFilterTipoVeiculo('');
+                setFilterBase('');
                 setSearchTerm('');
               }}
               className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold transition-all h-[38px]"

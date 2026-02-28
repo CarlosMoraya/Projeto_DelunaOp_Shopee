@@ -416,10 +416,11 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
               {sortOrder === 'desc' ? 'Maior' : 'Menor'}
             </button>
           </div>
-          <div className="h-48 md:h-64 w-full">
+          <div className="h-48 md:h-64 w-full [&_*:focus]:outline-none">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={dynamicHubData}
+                style={{ outline: 'none' }}
                 margin={{ top: 25, bottom: 20 }}
                 onClick={(data) => {
                   if (data && data.activeLabel) {
@@ -488,9 +489,9 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
           </div>
         </div>
 
-        <div className="h-64 md:h-80 w-full">
+        <div className="h-64 md:h-80 w-full [&_*:focus]:outline-none">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={dynamicHistoryData} margin={{ top: 40, right: 0, bottom: 20, left: 0 }}>
+            <ComposedChart data={dynamicHistoryData} style={{ outline: 'none' }} margin={{ top: 40, right: 0, bottom: 20, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis
                 dataKey="label"

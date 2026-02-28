@@ -1,14 +1,17 @@
-# Project Rules
+# Deluna Ops - Core Rules (Smart Context)
 
-1. **Context Awareness**: You MUST completely understand the project context and design system before proposing or executing task.
-   - Read `project_context.md` for project overview, tech stack, and navigation structure.
-   - Read `design_system.md` for color palette, typography, and component standards.
+1. **Expert Context Management**: You are the guardian of the project's consistency. Use your judgment to consult the following files whenever a task impacts UI standards, business logic, or global state:
+   - `project_context.md`: Context on navigation (`currentView`) and stack.
+   - `design_system.md`: Visual tokens (`deluna-*`) and component patterns.
+   - `ARCHITECTURE_LOG.md`: History of technical decisions.
+   
+2. **When to Consult**:
+   - **Mandatory**: For new features, refactoring, or complex bug fixes.
+   - **Optional**: For trivial text changes, simple CSS tweaks, or local cleanup.
 
-2. **Design Compliance**:
-   - Use the variables defined in `design_system.md` (e.g., `deluna-primary`, `Font Jakarta`, etc.).
-   - Follow the established component patterns (Tables, Cards, Sidebar).
+3. **Design & Tech Standards**:
+   - Framework: React 19 + Tailwind CSS.
+   - Style: "Dark Brand" aesthetic with `#1B4332`.
+   - Responsiveness: Tables MUST have `min-w-[1000px]`.
 
-3. **Tech Stack**:
-   - Framework: React 19
-   - Styling: Tailwind CSS
-   - Charts: Recharts
+4. **Self-Documentation**: Update `ARCHITECTURE_LOG.md` after any structural change so future iterations (or other AI sessions) stay aligned.

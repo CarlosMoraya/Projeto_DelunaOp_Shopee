@@ -283,9 +283,10 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                         <h3 className="text-deluna-primary text-base md:text-lg font-bold">Performance por Coordenador</h3>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Clique para filtrar</span>
                     </div>
-                    <div className="h-64 w-full">
+                    <div className="h-64 w-full [&_*:focus]:outline-none">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart
+                                style={{ outline: 'none' }}
                                 data={coordinatorData}
                                 onClick={(data: any) => {
                                     if (data && data.activeLabel) {
@@ -334,9 +335,9 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                         <h3 className="text-deluna-primary text-base md:text-lg font-bold">Concentração de Riscos</h3>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PNR vs Revertidos</span>
                     </div>
-                    <div className="h-64 w-full flex items-center justify-center">
+                    <div className="h-64 w-full flex items-center justify-center [&_*:focus]:outline-none">
                         <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
+                            <PieChart style={{ outline: 'none' }}>
                                 <Pie
                                     data={[
                                         { name: 'PNR', value: stats.totalFailures },
@@ -362,9 +363,10 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                         <h3 className="text-deluna-primary text-base md:text-lg font-bold">Performance por Base</h3>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Top 10 Bases / Hubs</span>
                     </div>
-                    <div className="h-72 w-full">
+                    <div className="h-72 w-full [&_*:focus]:outline-none">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart
+                                style={{ outline: 'none' }}
                                 data={hubPerformanceData}
                                 onClick={(data: any) => {
                                     if (data && data.activeLabel) {
