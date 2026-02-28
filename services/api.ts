@@ -738,7 +738,7 @@ export const fetchMonitoramentoData = async (url: string = GOOGLE_SCRIPT_URL): P
                     deliveredCount: deliveredCount,
                     deliveredPercentage: deliveredPercentage,
                     onHold: parseNum(getVal(row, 'On-hold', 'Pendentes', 'Em espera', 'OnHold')) || 0,
-                    assignedTime: String(getVal(row, 'Assigned Time', 'Hora Atribuição', 'Assigned_Time') || ''),
+                    assignedTime: String(getVal(row, 'Data Atrib', 'Assigned Time', 'Hora Atribuição', 'Assigned_Time') || ''),
                     timeSinceLastDelivery: String(getVal(row, 'Time Since Last delivery', 'Tempo Ultima Entrega', 'Last_Delivery') || ''),
                     coordinator: metadata ? metadata.coord : ''
                 };

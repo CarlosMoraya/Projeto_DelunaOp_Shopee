@@ -21,6 +21,7 @@ const Monitoramento: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'pending'>('all');
+    const [delayedFilter, setDelayedFilter] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -52,9 +53,36 @@ const Monitoramento: React.FC = () => {
                 (statusFilter === 'completed' && isCompleted) ||
                 (statusFilter === 'pending' && !isCompleted);
 
-            return matchHub && matchCoord && matchDriver && matchStatus;
+            // Filtro de Rotas Atrasadas (+2 dias ou sem data)
+            const matchDelayed = !delayedFilter || (() => {
+                if (isCompleted) return false; // Somente em aberto
+
+                const timeVal = (row.assignedTime || '').trim();
+                if (timeVal === '' || timeVal === '-') return true; // Sem data ou traço = crítica
+
+                let assignedDate: Date | null = null;
+
+                // Suporte para YYYY-MM-DD (ISO/Sheets)
+                if (/^\d{4}-\d{2}-\d{2}/.test(timeVal)) {
+                    assignedDate = new Date(timeVal.replace(/-/g, '/'));
+                } else {
+                    // Suporte para DD/MM/YYYY
+                    const parts = timeVal.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                    if (parts) {
+                        assignedDate = new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]));
+                    }
+                }
+
+                if (assignedDate && !isNaN(assignedDate.getTime())) {
+                    const diffDays = (Date.now() - assignedDate.getTime()) / (1000 * 60 * 60 * 24);
+                    return diffDays >= 2;
+                }
+                return false;
+            })();
+
+            return matchHub && matchCoord && matchDriver && matchStatus && matchDelayed;
         });
-    }, [tableData, selectedHub, selectedCoordinator, driverSearch, statusFilter]);
+    }, [tableData, selectedHub, selectedCoordinator, driverSearch, statusFilter, delayedFilter]);
 
     const paginatedData = useMemo(() => {
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -136,13 +164,14 @@ const Monitoramento: React.FC = () => {
         setSelectedCoordinator(null);
         setDriverSearch('');
         setStatusFilter('all');
+        setDelayedFilter(false);
     };
 
     return (
         <div className="p-4 md:p-10 flex flex-col gap-6 md:gap-10">
             {/* Header / Titulo */}
             <div className="flex flex-col gap-1">
-                <h1 className="text-2xl md:text-3xl font-black text-deluna-primary font-display uppercase tracking-tight">Monitoramento em Tempo Real</h1>
+                <h1 className="text-2xl md:text-3xl font-black text-deluna-primary font-display uppercase tracking-tight">Gestão de Entregas</h1>
                 <p className="text-sm md:text-base text-slate-500 font-medium">Acompanhamento granular da operação Shopee</p>
             </div>
 
@@ -257,15 +286,19 @@ const Monitoramento: React.FC = () => {
                         <p className="text-xs md:text-sm text-slate-500 font-medium">Performance individual atualizada</p>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-center">
-                        {/* Toggle Rotas em Aberto */}
-                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tight">Apenas Em Aberto</span>
+                        {/* Toggle Rotas Atrasadas (+2d) */}
+                        <div className="flex items-center gap-2 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100">
+                            <span className="text-[10px] font-black text-red-600 uppercase tracking-tight">Atrasadas (+2d)</span>
                             <button
-                                onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
-                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${statusFilter === 'pending' ? 'bg-deluna-primary' : 'bg-slate-300'}`}
+                                onClick={() => {
+                                    setDelayedFilter(!delayedFilter);
+                                    if (!delayedFilter) setStatusFilter('pending');
+                                    else setStatusFilter('all');
+                                }}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${delayedFilter ? 'bg-red-500' : 'bg-slate-300'}`}
                             >
                                 <span
-                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${statusFilter === 'pending' ? 'translate-x-5' : 'translate-x-1'}`}
+                                    className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${delayedFilter ? 'translate-x-5' : 'translate-x-1'}`}
                                 />
                             </button>
                         </div>
@@ -280,7 +313,7 @@ const Monitoramento: React.FC = () => {
                                 className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-deluna-primary outline-none focus:ring-2 focus:ring-deluna-primary/20 transition-all font-interface"
                             />
                         </div>
-                        {(selectedHub || selectedCoordinator || driverSearch || statusFilter !== 'all') && (
+                        {(selectedHub || selectedCoordinator || driverSearch || statusFilter !== 'all' || delayedFilter) && (
                             <button onClick={clearFilters} className="px-4 py-2 bg-red-50 text-red-600 text-xs font-bold rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2">
                                 <span className="material-symbols-outlined text-sm">filter_alt_off</span> Limpar
                             </button>
@@ -304,7 +337,7 @@ const Monitoramento: React.FC = () => {
                                     <th className="px-6 py-4 text-center">Entregues (#)</th>
                                     <th className="px-6 py-4 text-center">Entregues (%)</th>
                                     <th className="px-6 py-4 text-center">On-hold</th>
-                                    <th className="px-6 py-4">Hora Atrib.</th>
+                                    <th className="px-6 py-4">Data Atrib</th>
                                     <th className="px-6 py-4">Última Entrega</th>
                                 </tr>
                             </thead>
