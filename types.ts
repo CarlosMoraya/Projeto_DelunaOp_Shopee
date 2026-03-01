@@ -61,6 +61,7 @@ export interface RawDeliveryRow {
 export interface DeliveryData {
   date: string;
   id: string;
+  driverId?: string; // Novo campo: Id Driver (cruza com QLP)
   driver: string;
   hub: string;
   coordinator: string;
@@ -90,7 +91,7 @@ export interface QLPData {
   cliente: string;
   coordenador: string;
   statusQlp: string;
-  nomeId?: string;
+  driverId?: string;
   ultimaViagem?: string;
 }
 

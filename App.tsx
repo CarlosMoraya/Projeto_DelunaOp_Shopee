@@ -16,39 +16,31 @@ import Monitoramento from './pages/Monitoramento';
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DELIVERY_SUCCESS);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string | null>(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!localStorage.getItem('deluna_user_email');
+  });
+  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('deluna_user_email'));
+  const [userName, setUserName] = useState<string | null>(() => localStorage.getItem('deluna_user_name'));
+  const [checkingAuth, setCheckingAuth] = useState(false);
 
-  // Verificação inicial de autenticação
+  // Verificação de nome de usuário (caso falte no cache)
   useEffect(() => {
-    const savedEmail = localStorage.getItem('deluna_user_email');
-    const savedName = localStorage.getItem('deluna_user_name');
-    if (savedEmail) {
-      setUserEmail(savedEmail);
-      setUserName(savedName);
-      setIsAuthenticated(true);
-
-      // Se tiver e-mail mas não tiver nome (ou para garantir atualização), busca na API
-      if (!savedName) {
-        import('./services/api').then(({ fetchAccessData }) => {
-          fetchAccessData().then(accessData => {
-            const match = accessData.find(item => item.email === savedEmail.toLowerCase().trim());
-            if (match && match.user) {
-              setUserName(match.user);
-              localStorage.setItem('deluna_user_name', match.user);
-            }
-          });
+    if (isAuthenticated && !userName && userEmail) {
+      import('./services/api').then(({ fetchAccessData }) => {
+        fetchAccessData().then(accessData => {
+          const match = accessData.find(item => item.email === userEmail.toLowerCase().trim());
+          if (match && match.user) {
+            setUserName(match.user);
+            localStorage.setItem('deluna_user_name', match.user);
+          }
         });
-      }
+      });
     }
-    setCheckingAuth(false);
-  }, []);
+  }, [isAuthenticated, userEmail, userName]);
 
-  const handleLoginSuccess = (email: string, userName: string) => {
+  const handleLoginSuccess = (email: string, name: string) => {
     setUserEmail(email);
-    setUserName(userName);
+    setUserName(name);
     setIsAuthenticated(true);
   };
 
@@ -61,36 +53,49 @@ const App: React.FC = () => {
   };
 
   // Estados globais de data
+  const [isSyncingDate, setIsSyncingDate] = useState(() => {
+    const cached = sessionStorage.getItem('deluna_sync_end_date');
+    const cachedVersion = sessionStorage.getItem('deluna_data_version');
+    return !(cached && cachedVersion === 'v6');
+  });
+
   const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+    const cached = sessionStorage.getItem('deluna_sync_end_date');
+    const cachedVersion = sessionStorage.getItem('deluna_data_version');
+    return (cached && cachedVersion === 'v6') ? cached : '';
   });
   const [endDate, setEndDate] = useState(() => {
-    // Tenta recuperar do sessionStorage para manter a data sincronizada pós-refresh
-    const cachedEndDate = sessionStorage.getItem('deluna_sync_end_date');
-    if (cachedEndDate) return cachedEndDate;
-
-    return new Date().toISOString().split('T')[0];
+    const cached = sessionStorage.getItem('deluna_sync_end_date');
+    const cachedVersion = sessionStorage.getItem('deluna_data_version');
+    return (cached && cachedVersion === 'v6') ? cached : '';
   });
 
-  // Busca a data mais recente da planilha para inicializar o filtro 'Até'
-  useEffect(() => {
-    if (isAuthenticated) {
-      import('./services/api').then(({ fetchDeliveryData }) => {
-        fetchDeliveryData().then(data => {
-          if (data && data.length > 0) {
-            // Os dados já vêm ordenados por data decrescente da API
-            const latestDate = data[0].date;
-            if (latestDate) {
-              setEndDate(latestDate);
-              sessionStorage.setItem('deluna_sync_end_date', latestDate);
-              console.log("Filtro de data final atualizado e persistido:", latestDate);
-            }
-          }
-        });
-      });
+  // Sincronização definitiva: Busca a data mais recente
+  const syncDatesWithLatestData = async () => {
+    try {
+      const { fetchDeliveryData } = await import('./services/api');
+      const data = await fetchDeliveryData();
+      if (data && data.length > 0) {
+        const latestDate = data[0].date;
+        if (latestDate) {
+          setStartDate(latestDate);
+          setEndDate(latestDate);
+          sessionStorage.setItem('deluna_sync_end_date', latestDate);
+          sessionStorage.setItem('deluna_data_version', 'v6');
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao sincronizar datas:", err);
+    } finally {
+      setIsSyncingDate(false);
     }
-  }, [isAuthenticated]);
+  };
+
+  useEffect(() => {
+    if (isAuthenticated && isSyncingDate) {
+      syncDatesWithLatestData();
+    }
+  }, [isAuthenticated, isSyncingDate]);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -124,10 +129,13 @@ const App: React.FC = () => {
     setIsSidebarOpen(false); // Fecha a sidebar no mobile após navegar
   };
 
-  if (checkingAuth) {
+  if (checkingAuth || isSyncingDate) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
-        <div className="w-10 h-10 border-4 border-deluna-primary border-t-transparent rounded-full animate-spin"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-deluna-primary border-t-transparent rounded-full animate-spin"></div>
+          {isSyncingDate && <p className="text-sm text-slate-500 font-medium animate-pulse">Sincronizando dados mais recentes...</p>}
+        </div>
       </div>
     );
   }

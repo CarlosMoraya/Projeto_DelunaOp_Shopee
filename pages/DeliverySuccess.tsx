@@ -602,7 +602,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
                 <thead className="bg-[#F8FAFC]">
                   <tr className="text-[#64748B] text-[9px] md:text-[10px] font-bold uppercase tracking-widest">
                     <th className="px-6 md:px-8 py-4">Data</th>
-                    <th className="px-6 md:px-8 py-4">ID</th>
+                    <th className="px-6 md:px-8 py-4">ID Driver</th>
                     <th className="px-6 md:px-8 py-4">AT</th>
                     <th className="px-6 md:px-8 py-4">Motorista</th>
                     <th className="px-6 md:px-8 py-4 text-right">Qtd ATs</th>
@@ -622,7 +622,7 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
                         <td className="px-6 md:px-8 py-4 md:py-5 text-xs md:text-sm font-medium text-[#475569]">
                           {parseLocalDate(row.date).toLocaleDateString('pt-BR') !== 'Invalid Date' ? parseLocalDate(row.date).toLocaleDateString('pt-BR') : row.date}
                         </td>
-                        <td className="px-6 md:px-8 py-4 md:py-5 text-xs md:text-sm font-bold text-[#64748B]">{row.id}</td>
+                        <td className="px-6 md:px-8 py-4 md:py-5 text-[10px] md:text-xs font-mono font-bold text-slate-400">{row.driverId || 'S/ID'}</td>
                         <td className="px-6 md:px-8 py-4 md:py-5 text-xs md:text-sm font-bold text-deluna-primary">{row.atCode}</td>
                         <td className="px-6 md:px-8 py-4 md:py-5">
                           <div className="flex items-center gap-3">

@@ -4,8 +4,8 @@ import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, Meta
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
 
-const CACHE_KEY = 'delivery_data_cache_v5';
-const QLP_CACHE_KEY = 'qlp_data_cache_v2';
+const CACHE_KEY = 'delivery_data_cache_v6';
+const QLP_CACHE_KEY = 'qlp_data_cache_v4';
 const METAS_CACHE_KEY = 'metas_data_cache_v2';
 const METAS_DS_CACHE_KEY = 'metas_ds_data_cache_v1';
 const METAS_CAPTACAO_CACHE_KEY = 'metas_captacao_data_cache_v1';
@@ -30,6 +30,9 @@ export const clearApiCache = () => {
     localStorage.removeItem(PNR_CACHE_KEY);
     localStorage.removeItem(METAS_PERDAS_CACHE_KEY);
     localStorage.removeItem(MONITORAMENTO_CACHE_KEY);
+    // Limpa estados de sessão para forçar recalculo total
+    sessionStorage.removeItem('deluna_sync_end_date');
+    sessionStorage.removeItem('deluna_data_version');
     console.log("Caches limpos com sucesso!");
 };
 
@@ -77,7 +80,7 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
         }
 
         // 2. Buscar da API (Removendo limit para pegar todos e filtrar no front)
-        const response = await fetch(`${url}?tab=Base_Rotas_2026`);
+        const response = await fetch(`${url}?tab=Base_Rotas`);
         if (!response.ok) {
             throw new Error(`Erro na API: ${response.statusText}`);
         }
@@ -90,7 +93,12 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
         }
 
         const processedData = rawData
-            .filter(row => row.Motorista && row.Remessas !== "" && row.Remessas !== undefined)
+            .filter(row => {
+                const motorista = getVal(row, 'Motorista', 'DRIVER', 'NOME DO MOTORISTA');
+                const remessas = getVal(row, 'Remessas', 'QTD_AT', 'QUANTIDADE');
+                return motorista && String(motorista).trim() !== '' &&
+                    remessas !== '' && remessas !== undefined && remessas !== null;
+            })
             .map(row => {
                 const atQuantity = parseNum(getVal(row, 'Remessas', 'QTD_AT', 'QUANTIDADE')) || 0;
                 const delivered = parseNum(getVal(row, 'Entregues', 'ENTREGUE', 'DELIVERED')) || 0;
@@ -132,6 +140,7 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
                 return {
                     date: formattedDate,
                     id: String(getVal(row, 'Nome Id', 'NOME ID', 'ID') || 'S/ID').trim(),
+                    driverId: String(getVal(row, 'Id Driver', 'ID DRIVER', 'DRIVER_ID', 'ID_DRIVER') || '').trim(),
                     driver: String(getVal(row, 'Motorista', 'DRIVER') || 'S/M'),
                     hub: String(getVal(row, 'Bases', 'BASE', 'HUB') || 'S/H'),
                     coordinator: String(getVal(row, 'Coordenador', 'COORD', 'SUPERVISOR') || 'S/C'),
@@ -369,12 +378,11 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
                 const baseName = String(getVal(row, 'BASE') || '');
                 const normalizedBaseName = normalizeBase(baseName);
                 const metadata = metadataMap.get(normalizedBaseName);
-                const nomeId = String(getVal(row, 'NOME ID', 'ID') || '').trim();
 
                 return {
                     base: baseName,
                     placa: String(getVal(row, 'PLACA') || ''),
-                    nome: String(getVal(row, 'NOME', 'NOME DO MOTORISTA', 'MOTORISTA') || nomeId || ''),
+                    nome: String(getVal(row, 'NOME MOTORISTA', 'NOME', 'MOTORISTA', 'NOME DO MOTORISTA') || '').trim(),
                     situacaoCnh: String(getVal(row, 'SITUAÇÃO CNH', 'CNH') || ''),
                     situacaoMotorista: String(getVal(row, 'SITUAÇÃO MOTORISTA', 'MOTORISTA') || ''),
                     tipoVeiculo: String(getVal(row, 'TIPO DO VEÍCULO', 'TIPO VEICULO') || ''),
@@ -382,7 +390,8 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
                     cliente: String(getVal(row, 'Q CLENTE', 'CLIENTE') || ''),
                     coordenador: metadata ? metadata.coord : '',
                     statusQlp: String(getVal(row, 'STATUS QLP', 'SITUAÇÃO QLP', 'STATUS_QLP') || ''),
-                    nomeId
+                    driverId: String(getVal(row, 'Id Driver', 'ID DRIVER', 'ID_DRIVER') || '').trim(),
+                    ultimaViagem: '' // Será preenchido na UI via cruzamento
                 };
             });
 

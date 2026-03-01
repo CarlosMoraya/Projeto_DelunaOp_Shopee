@@ -172,7 +172,7 @@ const Monitoramento: React.FC = () => {
             {/* Header / Titulo */}
             <div className="flex flex-col gap-1">
                 <h1 className="text-2xl md:text-3xl font-black text-deluna-primary font-display uppercase tracking-tight">Gestão de Entregas</h1>
-                <p className="text-sm md:text-base text-slate-500 font-medium">Acompanhamento granular da operação Shopee</p>
+                <p className="text-sm md:text-base text-slate-500 font-medium">Somente dados do dia</p>
             </div>
 
             {/* Cards de Métricas */}

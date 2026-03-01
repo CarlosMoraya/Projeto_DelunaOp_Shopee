@@ -31,3 +31,10 @@ This file records key technical decisions, major features, and architectural cha
 - **Data Source**: Deep integration with Google Sheets via custom API services.
 - **UI/UX**: Premium "Dark Brand" look centered around `#1B4332`.
 - **Responsive Tables**: Always use `min-w-[1000px]` with horizontal scroll to preserve data density.
+
+## [2026-03-01] Google Sheets Rename: Base_Rotas_2026 → Base_Rotas
+- **Cause**: User renamed the tab in Google Sheets and added a new `Id Driver` column.
+- **Fix**: Updated `api.ts` `fetchDeliveryData` to fetch `?tab=Base_Rotas` (was `Base_Rotas_2026`).
+- **Cache**: Incremented `CACHE_KEY` from `v5` to `v6` to force cache invalidation on all clients.
+- **New field**: Added `driverId?: string` to `DeliveryData` interface (maps `Id Driver` column), enabling future cross-reference with the QLP tab's `Id Driver`.
+

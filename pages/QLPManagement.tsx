@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { QLPData } from '../types';
-import { fetchQLPData, fetchDeliveryData } from '../services/api';
+import { fetchQLPData, fetchDeliveryData, clearApiCache } from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 const checkVehicleType = (tipoVeiculo: string | undefined, filter: string) => {
@@ -48,8 +48,7 @@ const QLPManagement: React.FC = () => {
       setLoading(true);
       setError(null);
       if (force) {
-        localStorage.removeItem('qlp_data_cache_v1');
-        localStorage.removeItem('delivery_data_cache_v1');
+        clearApiCache();
       }
 
       // 1. Carrega QLP rapidamente e exibe a tabela
@@ -63,15 +62,18 @@ const QLPManagement: React.FC = () => {
       // 2. Carrega dados de rotas em background e faz o JOIN
       const deliveryData = await fetchDeliveryData();
       const lastTripMap = new Map<string, string>();
+
+      // Como deliveryData vem ordenado por data DESC no api.ts, 
+      // o primeiro registro de cada driverId é a última viagem.
       deliveryData.forEach(d => {
-        if (!lastTripMap.has(d.id)) {
-          lastTripMap.set(d.id, d.date);
+        if (d.driverId && !lastTripMap.has(d.driverId)) {
+          lastTripMap.set(d.driverId, d.date);
         }
       });
 
       setAllData(prev => prev.map(row => ({
         ...row,
-        ultimaViagem: lastTripMap.get(row.nomeId || '') || row.ultimaViagem || ''
+        ultimaViagem: (row.driverId && lastTripMap.get(row.driverId)) || row.ultimaViagem || ''
       })));
 
     } catch (err: any) {
@@ -569,6 +571,7 @@ const QLPManagement: React.FC = () => {
                     { key: 'base', label: 'BASE' },
                     { key: 'coordenador', label: 'COORDENADOR' },
                     { key: 'placa', label: 'PLACA' },
+                    { key: 'driverId', label: 'ID DRIVER' },
                     { key: 'nome', label: 'NOME DO MOTORISTA' },
                     { key: 'ultimaViagem', label: 'ÚLTIMA VIAGEM', center: true },
                     { key: 'tipoVeiculo', label: 'TIPO', center: true },
@@ -599,7 +602,7 @@ const QLPManagement: React.FC = () => {
               <tbody className="text-[11px] font-medium text-slate-700">
                 {sortedData.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-20 text-center font-black text-slate-400 uppercase tracking-widest">
+                    <td colSpan={10} className="p-20 text-center font-black text-slate-400 uppercase tracking-widest">
                       Nenhum registro encontrado com os filtros atuais.
                     </td>
                   </tr>
@@ -609,6 +612,7 @@ const QLPManagement: React.FC = () => {
                       <td className="px-6 py-4 font-black text-deluna-primary border-r border-slate-100 uppercase">{row.base}</td>
                       <td className="px-6 py-4 font-semibold text-slate-600 border-r border-slate-100 uppercase text-[10px]">{row.coordenador}</td>
                       <td className="px-6 py-4 font-mono font-bold text-slate-900 border-r border-slate-100">{row.placa}</td>
+                      <td className="px-6 py-4 font-mono font-bold text-slate-400 border-r border-slate-100 text-[10px]">{row.driverId || '-'}</td>
                       <td className="px-6 py-4 font-semibold border-r border-slate-100 uppercase">{row.nome}</td>
                       <td className="px-6 py-4 text-center border-r border-slate-100 font-mono font-bold text-slate-500">
                         {row.ultimaViagem ? new Date(row.ultimaViagem + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
