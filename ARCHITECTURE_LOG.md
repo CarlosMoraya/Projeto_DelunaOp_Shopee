@@ -38,3 +38,10 @@ This file records key technical decisions, major features, and architectural cha
 - **Cache**: Incremented `CACHE_KEY` from `v5` to `v6` to force cache invalidation on all clients.
 - **New field**: Added `driverId?: string` to `DeliveryData` interface (maps `Id Driver` column), enabling future cross-reference with the QLP tab's `Id Driver`.
 
+## [2026-03-03] Fix: Valor PNR Formatting (Google Sheets Interpretation)
+- **Problem**: Google Sheets intermittently interpreted "2.40" as dates (e.g., "02/04"), causing zeroes or mangled values in the PNR table.
+- **Solution**:
+    - **API Layer**: Improved `fetchPNRData` to classify values into numbers or text. Detects ISO dates and attempts recovery.
+    - **Types**: Extended `PNRRow` and `PNROperationalDetail` to support mixed types (`number | string`) and `textValues` collection during grouping.
+    - **UI Layer**: Implemented a custom formatter in `PNRStuck.tsx` that replaces `.` with `,` for both numbers and text, fulfilling the project's formatting requirements for the Brazilian locale.
+    - **Visual**: The "Valor PNR" column now shows the numeric sum alongside a parenthetical list of any text-based values encountered.

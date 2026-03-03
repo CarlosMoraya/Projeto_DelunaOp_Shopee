@@ -11,7 +11,7 @@ const METAS_DS_CACHE_KEY = 'metas_ds_data_cache_v1';
 const METAS_CAPTACAO_CACHE_KEY = 'metas_captacao_data_cache_v1';
 const METAS_PROTAGONISMO_CACHE_KEY = 'metas_protagonismo_data_cache_v1';
 const ACESSOS_CACHE_KEY = 'acessos_data_cache_v1';
-const PNR_CACHE_KEY = 'pnr_data_cache_v4';
+const PNR_CACHE_KEY = 'pnr_data_cache_v12';
 const METAS_PERDAS_CACHE_KEY = 'metas_perdas_data_cache_v1';
 const MONITORAMENTO_CACHE_KEY = 'monitoramento_data_cache_v1';
 const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 horas
@@ -30,6 +30,10 @@ export const clearApiCache = () => {
     localStorage.removeItem(PNR_CACHE_KEY);
     localStorage.removeItem(METAS_PERDAS_CACHE_KEY);
     localStorage.removeItem(MONITORAMENTO_CACHE_KEY);
+    // Limpa versões antigas de PNR cache que podem estar ocupando espaço
+    for (let i = 1; i <= 10; i++) {
+        localStorage.removeItem(`pnr_data_cache_v${i}`);
+    }
     // Limpa estados de sessão para forçar recalculo total
     sessionStorage.removeItem('deluna_sync_end_date');
     sessionStorage.removeItem('deluna_data_version');
@@ -176,7 +180,7 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
     }
 };
 
-const fetchBaseMetadata = async (url: string = GOOGLE_SCRIPT_URL): Promise<{ metadataMap: Map<string, { coord: string; lider: string; localidade: string; baseId: string }>; normalizeBase: (s: string) => string }> => {
+export const fetchBaseMetadata = async (url: string = GOOGLE_SCRIPT_URL): Promise<{ metadataMap: Map<string, { coord: string; lider: string; localidade: string; baseId: string }>; normalizeBase: (s: string) => string }> => {
     try {
         const response = await fetch(`${url}?tab=${encodeURIComponent('Lista de Bases')}`);
         if (!response.ok) return { metadataMap: new Map(), normalizeBase: (s: string) => s };
@@ -516,6 +520,14 @@ export const fetchAllowedEmails = async (url: string = GOOGLE_SCRIPT_URL): Promi
 
 export const fetchPNRData = async (url: string = GOOGLE_SCRIPT_URL): Promise<PNRRow[]> => {
     try {
+        // Limpa caches antigos de PNR para liberar espaço no localStorage
+        for (let i = 1; i <= 15; i++) {
+            const oldKey = `pnr_data_cache_v${i}`;
+            if (oldKey !== PNR_CACHE_KEY) {
+                localStorage.removeItem(oldKey);
+            }
+        }
+
         const cached = localStorage.getItem(PNR_CACHE_KEY);
         if (cached) {
             const { data, timestamp } = JSON.parse(cached);
@@ -524,7 +536,7 @@ export const fetchPNRData = async (url: string = GOOGLE_SCRIPT_URL): Promise<PNR
             }
         }
 
-        const response = await fetch(`${url}?tab=Base_PNR`);
+        const response = await fetch(`${url}?tab=PNR`);
         if (!response.ok) {
             throw new Error(`Erro na API PNR: ${response.statusText}`);
         }
@@ -538,56 +550,65 @@ export const fetchPNRData = async (url: string = GOOGLE_SCRIPT_URL): Promise<PNR
 
         const processedData = rawData
             .filter(row => {
-                const driver = getVal(row, 'Motorista', 'DRIVER', 'Nome do motorista');
-                const tracking = getVal(row, 'SPX Tracking Number', 'TRACKING', 'ID', 'Tracking');
-                return driver && tracking;
+                const driver = getVal(row, 'Driver', 'Motorista', 'Nome do motorista');
+                const tracking = getVal(row, 'SPXTN', 'SPX Tracking Number');
+                if (!driver || !tracking) return false;
+
+                // Filtrar estações (ex: XPT_RJ_Rio - Bonsucesso_03)
+                const driverStr = String(driver).trim();
+                if (driverStr.toUpperCase().startsWith('XPT')) return false;
+
+                return true;
             })
-            .map((row, index) => {
-                // Prioridade absoluta para DATA DA ROTA
-                let rawDate = String(getVal(row, 'DATA DA ROTA') || getVal(row, 'DATA') || getVal(row, 'Date') || '');
-                let formattedDate = '';
+            .map((row) => {
+                const driver = String(getVal(row, 'Driver', 'Motorista', 'Nome do motorista') || '').trim();
 
-                if (rawDate.includes('T')) {
-                    formattedDate = rawDate.split('T')[0];
-                } else if (rawDate.includes('/')) {
-                    const parts = rawDate.split('/');
-                    if (parts.length === 3) {
-                        let [d, m, y] = parts;
-                        if (y.length === 2) y = '20' + y;
-                        formattedDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                    } else if (parts.length === 2) {
-                        // Caso venha apenas DD/MM, assume o ano atual
-                        const [d, m] = parts;
-                        const y = new Date().getFullYear();
-                        formattedDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                    } else {
-                        formattedDate = rawDate;
-                    }
+                const rawValue = getVal(row, 'PNR Order value', 'Order value');
+
+                // Detecta se o valor foi corrompido pelo Sheets (interpretado como data)
+                // Ex: 2.40 virou "02/04", 1.50 virou "01/05", etc.
+                const rawStr = String(rawValue ?? '').trim();
+                const isCorruptedDate = typeof rawValue === 'string' &&
+                    (rawStr.includes('/') || rawStr.includes(':'));
+
+                let numericValue: number;
+                let pnrOrderValue: string;
+
+                if (isCorruptedDate) {
+                    // Valor corrompido como data - NÃO deve ser somado como número
+                    numericValue = 0;
+                    pnrOrderValue = rawStr; // Mantém original para visibilidade
+                } else if (typeof rawValue === 'number') {
+                    numericValue = rawValue;
+                    pnrOrderValue = rawValue.toFixed(2).replace('.', ',');
                 } else {
-                    formattedDate = rawDate;
-                }
-
-                if (index === 0) {
-                    console.log("PNR Data Sample:", {
-                        raw: rawDate,
-                        formatted: formattedDate,
-                        keys: Object.keys(row)
-                    });
+                    // Usa parseNum que trata formato BR (1.234,56) e números puros
+                    numericValue = parseNum(rawValue);
+                    if (numericValue > 0) {
+                        pnrOrderValue = numericValue.toFixed(2).replace('.', ',');
+                    } else {
+                        pnrOrderValue = rawStr || '0,00';
+                    }
                 }
 
                 return {
-                    date: formattedDate,
-                    driver: String(getVal(row, 'Motorista', 'DRIVER', 'Nome do motorista') || '').trim(),
-                    base: String(getVal(row, 'Base', 'BASES', 'HUB') || '').trim(),
-                    trackingNumber: String(getVal(row, 'SPX Tracking Number', 'TRACKING', 'ID') || '').trim(),
-                    statusShopee: String(getVal(row, 'Status Shopee', 'STATUS') || '').trim()
+                    driver,
+                    trackingNumber: String(getVal(row, 'SPXTN', 'SPX Tracking Number') || '').trim(),
+                    statusShopee: String(getVal(row, 'Status', 'Status Shopee') || '').trim(),
+                    assignmentTaskId: String(getVal(row, 'Assignment Task ID') || '').trim(),
+                    pnrOrderValue,
+                    numericValue
                 };
             });
 
-        localStorage.setItem(PNR_CACHE_KEY, JSON.stringify({
-            data: processedData,
-            timestamp: Date.now()
-        }));
+        try {
+            localStorage.setItem(PNR_CACHE_KEY, JSON.stringify({
+                data: processedData,
+                timestamp: Date.now()
+            }));
+        } catch (cacheError) {
+            console.warn('PNR: Cache não salvo (storage cheio). Dados retornados sem cache.', cacheError);
+        }
 
         return processedData;
 

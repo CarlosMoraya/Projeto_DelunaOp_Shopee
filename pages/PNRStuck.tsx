@@ -3,7 +3,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     Cell, PieChart, Pie, Legend, LabelList
 } from 'recharts';
-import { fetchDeliveryData, fetchPNRData } from '../services/api';
+import { fetchDeliveryData, fetchPNRData, fetchBaseMetadata } from '../services/api';
 import { DeliveryData, PNROperationalDetail, PNRRow } from '../types';
 
 const ITEMS_PER_PAGE = 20;
@@ -23,12 +23,48 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
         const loadData = async () => {
             try {
                 setLoading(true);
-                const [delivery, pnr] = await Promise.all([
+                const [delivery, pnr, baseInfo] = await Promise.all([
                     fetchDeliveryData(),
-                    fetchPNRData()
+                    fetchPNRData(),
+                    fetchBaseMetadata()
                 ]);
+
+                // Cross-reference to find Date based on assignmentTaskId
+                const normalizeId = (id: string) => String(id || '').replace(/\s+/g, '').toUpperCase();
+
+                const deliveryMap = new Map<string, DeliveryData>();
+                delivery.forEach(d => {
+                    if (d.atCode) {
+                        deliveryMap.set(normalizeId(d.atCode), d);
+                    }
+                });
+
+                const { metadataMap, normalizeBase } = baseInfo;
+
+                const enrichedPnr = pnr.map(p => {
+                    const atId = normalizeId(p.assignmentTaskId);
+                    const matchedDelivery = deliveryMap.get(atId);
+
+                    // A data vem do cruzamento (Data do Extravio). Se não localizado, "-"
+                    const extravioDate = matchedDelivery ? matchedDelivery.date : '-';
+
+                    let finalBaseName = matchedDelivery ? matchedDelivery.hub : '';
+                    const normalized = normalizeBase(finalBaseName);
+                    const meta = metadataMap.get(normalized);
+
+                    if (meta && meta.baseId) {
+                        finalBaseName = meta.baseId;
+                    }
+
+                    return {
+                        ...p,
+                        date: extravioDate,
+                        base: finalBaseName
+                    };
+                });
+
                 setTableData(delivery);
-                setPnrData(pnr);
+                setPnrData(enrichedPnr);
                 setError(null);
             } catch (err) {
                 setError('Erro ao carregar dados para PNR & Stuck.');
@@ -52,11 +88,20 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
         const hubNorm = selectedHub?.trim().toUpperCase();
 
         return pnrData.filter(row => {
-            if (!row.date) return false;
+            const matchHub = !hubNorm || row.base.trim().toUpperCase() === hubNorm;
+            if (!matchHub) return false;
+
+            // Se não houver data definida (foi cruzado mas não localizado)
+            if (!row.date || row.date === '-') {
+                // Só exibe se não houver um filtro de data explícito (ou seja, se startDate/endDate forem vazios)
+                // Ou podemos optar por nunca exibir se não houver data, mas o usuário quer "apenas os dados da tabela PNR".
+                // Para manter a integridade do filtro de data, vamos ignorar se houver um range ativo.
+                return !startDate && !endDate;
+            }
+
             const rowDate = new Date(row.date + 'T00:00:00').getTime();
             const matchDate = rowDate >= start && rowDate <= end;
-            const matchHub = !hubNorm || row.base.trim().toUpperCase() === hubNorm;
-            return matchDate && matchHub;
+            return matchDate;
         });
     }, [pnrData, startDate, endDate, selectedHub]);
 
@@ -75,70 +120,109 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
     }, [tableData, startDate, endDate, selectedHub]);
 
     const operationalBaseData = useMemo(() => {
-        const pnrGroups = new Map<string, { count: number, reverted: number, originalDriver: string, originalBase: string }>();
-        filteredPnr.forEach(row => {
-            const driverNorm = row.driver.trim().toUpperCase();
-            const baseNorm = row.base.trim().toUpperCase();
-            const key = `${driverNorm}|${baseNorm}`;
+        const pnrGroups = new Map<string, {
+            count: number,
+            reverted: number,
+            originalDriver: string,
+            originalBase: string,
+            date: string,
+            totalValue: number,
+            atDetails: Array<{ id: string, date: string, value: number, status: string }>
+        }>();
 
-            const current = pnrGroups.get(key) || { count: 0, reverted: 0, originalDriver: row.driver, originalBase: row.base };
+        // Função interna para normalizar nome removendo o [ID] para fins de junção (join)
+        const normalizeForJoin = (name: string) => name.replace(/\[.*?\]/g, '').trim().toUpperCase();
+
+        filteredPnr.forEach(row => {
+            const driverKey = normalizeForJoin(row.driver);
+            const key = driverKey; // Agregação exclusiva por Motorista
+
+            const current = pnrGroups.get(key) || {
+                count: 0,
+                reverted: 0,
+                originalDriver: row.driver,
+                originalBase: row.base || '-',
+                date: row.date || '-',
+                totalValue: 0,
+                atDetails: []
+            };
+
+            // Adiciona detalhe da AT
+            const atDetail = {
+                id: row.assignmentTaskId,
+                trackingNumber: row.trackingNumber,
+                date: row.date || '-',
+                value: row.numericValue,
+                status: row.statusShopee
+            };
+
             pnrGroups.set(key, {
                 ...current,
                 count: current.count + 1,
-                reverted: current.reverted + (row.statusShopee.toUpperCase() === 'REVERTIDO' ? 1 : 0)
+                reverted: current.reverted + (row.statusShopee.trim().toUpperCase() === 'REVERSED' ? 1 : 0),
+                totalValue: current.totalValue + row.numericValue,
+                atDetails: [...current.atDetails, atDetail]
             });
         });
 
         const deliveryGroups = new Map<string, { total: number, pending: number, coordinator: string }>();
         filteredDelivery.forEach(row => {
-            const driverNorm = row.driver.trim().toUpperCase();
-            const baseNorm = row.hub.trim().toUpperCase();
-            const key = `${driverNorm}|${baseNorm}`;
+            const driverKey = normalizeForJoin(row.driver);
+            const key = driverKey; // Agregação exclusiva por Motorista
             const current = deliveryGroups.get(key) || { total: 0, pending: 0, coordinator: row.coordinator || 'S/C' };
             deliveryGroups.set(key, {
                 total: current.total + row.atQuantity,
                 pending: current.pending + row.pending,
-                coordinator: current.coordinator
+                coordinator: current.coordinator === 'S/C' ? (row.coordinator || 'S/C') : current.coordinator
             });
         });
 
-        const allKeys = new Set([...pnrGroups.keys(), ...deliveryGroups.keys()]);
+        // O usuário quer exibir APENAS os dados da tabela PNR.
+        const pnrKeys = Array.from(pnrGroups.keys());
 
-        return Array.from(allKeys).map(key => {
-            const [driverNorm, baseNorm] = key.split('|');
-            const pnrEntry = pnrGroups.get(key);
+        return pnrKeys.map(key => {
+            const pnrEntry = pnrGroups.get(key)!;
             const deliveryEntry = deliveryGroups.get(key);
 
-            const pnrCount = pnrEntry?.count || 0;
-            const revertedCount = pnrEntry?.reverted || 0;
+            const pnrCount = pnrEntry.count;
+            const revertedCount = pnrEntry.reverted;
             const totalPackets = deliveryEntry?.total || 0;
             const pendingCount = deliveryEntry?.pending || 0;
             const coordinator = deliveryEntry?.coordinator || 'S/C';
+            const totalValue = pnrEntry.totalValue;
+
+            // Se houver mais de uma data, mostramos um aviso visual
+            const dates = Array.from(new Set(pnrEntry.atDetails.map(d => d.date).filter(d => d !== '-')));
+            const displayDate = dates.length > 1 ? `Multiplas (${dates.length})` : (dates[0] || '-');
 
             return {
-                driver: pnrEntry?.originalDriver || driverNorm,
-                base: pnrEntry?.originalBase || baseNorm,
+                driver: pnrEntry.originalDriver,
+                base: pnrEntry.originalBase,
+                date: displayDate,
                 coordinator,
                 pnrCount,
                 revertedCount,
                 totalPackets,
                 pendingCount,
+                totalValue,
+                atDetails: pnrEntry.atDetails,
                 pnrPercentage: totalPackets > 0 ? (pnrCount / totalPackets) * 100 : 0
             };
         });
     }, [filteredPnr, filteredDelivery]);
 
     const coordinatorData = useMemo(() => {
-        const statsMap = new Map<string, { pnrCount: number, totalPackets: number }>();
+        const statsMap = new Map<string, { pnrCount: number, totalPackets: number, totalValue: number }>();
         operationalBaseData.forEach(row => {
             if (chartFilterHub && row.base.trim().toUpperCase() !== chartFilterHub.trim().toUpperCase()) return;
             if (driverSearch && !row.driver.toLowerCase().includes(driverSearch.toLowerCase())) return;
 
             const coord = row.coordinator;
-            const current = statsMap.get(coord) || { pnrCount: 0, totalPackets: 0 };
+            const current = statsMap.get(coord) || { pnrCount: 0, totalPackets: 0, totalValue: 0 };
             statsMap.set(coord, {
                 pnrCount: current.pnrCount + row.pnrCount,
-                totalPackets: current.totalPackets + row.totalPackets
+                totalPackets: current.totalPackets + row.totalPackets,
+                totalValue: current.totalValue + row.totalValue
             });
         });
 
@@ -146,22 +230,24 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
             .map(([name, data]) => ({
                 name,
                 pnrCount: data.pnrCount,
-                pnrRate: data.totalPackets > 0 ? (data.pnrCount / data.totalPackets) * 100 : 0
+                pnrRate: data.totalPackets > 0 ? (data.pnrCount / data.totalPackets) * 100 : 0,
+                totalValue: data.totalValue
             }))
             .sort((a, b) => b.pnrCount - a.pnrCount);
     }, [operationalBaseData, chartFilterHub, driverSearch]);
 
     const hubPerformanceData = useMemo(() => {
-        const statsMap = new Map<string, { pnrCount: number, totalPackets: number }>();
+        const statsMap = new Map<string, { pnrCount: number, totalPackets: number, totalValue: number }>();
         operationalBaseData.forEach(row => {
             if (chartFilterCoord && row.coordinator !== chartFilterCoord) return;
             if (driverSearch && !row.driver.toLowerCase().includes(driverSearch.toLowerCase())) return;
 
             const hub = row.base.trim().toUpperCase();
-            const current = statsMap.get(hub) || { pnrCount: 0, totalPackets: 0 };
+            const current = statsMap.get(hub) || { pnrCount: 0, totalPackets: 0, totalValue: 0 };
             statsMap.set(hub, {
                 pnrCount: current.pnrCount + row.pnrCount,
-                totalPackets: current.totalPackets + row.totalPackets
+                totalPackets: current.totalPackets + row.totalPackets,
+                totalValue: current.totalValue + row.totalValue
             });
         });
 
@@ -169,7 +255,8 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
             .map(([name, data]) => ({
                 name,
                 pnrCount: data.pnrCount,
-                pnrRate: data.totalPackets > 0 ? (data.pnrCount / data.totalPackets) * 100 : 0
+                pnrRate: data.totalPackets > 0 ? (data.pnrCount / data.totalPackets) * 100 : 0,
+                totalValue: data.totalValue
             }))
             .sort((a, b) => b.pnrCount - a.pnrCount)
             .slice(0, 10);
@@ -186,7 +273,9 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
         if (chartFilterHub) {
             filtered = filtered.filter(d => d.base.trim().toUpperCase() === chartFilterHub.trim().toUpperCase());
         }
-        return filtered.sort((a, b) => b.pnrCount - a.pnrCount);
+        return filtered
+            .filter(d => d.pnrCount > 0)
+            .sort((a, b) => b.pnrCount - a.pnrCount);
     }, [operationalBaseData, driverSearch, chartFilterCoord, chartFilterHub]);
 
     const stats = useMemo(() => {
@@ -194,15 +283,38 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
         const totalFailures = operationalDetails.reduce((acc, row) => acc + row.pnrCount, 0);
         const totalReverted = operationalDetails.reduce((acc, row) => acc + row.revertedCount, 0);
         const totalPending = operationalDetails.reduce((acc, row) => acc + row.pendingCount, 0);
+        const totalPNRValue = operationalDetails.reduce((acc, row) => acc + row.totalValue, 0);
 
         return {
             totalShipments,
             totalFailures,
             totalReverted,
             totalPending,
+            totalPNRValue,
             pnrRate: totalShipments > 0 ? (totalFailures / totalShipments) * 100 : 0
         };
     }, [operationalDetails]);
+
+    const riskData = useMemo(() => {
+        const TRANSLATIONS: Record<string, string> = {
+            'REVERSED': 'Revertido',
+            'LOST': 'Extraviado',
+            'DAMAGED': 'Avariado'
+        };
+
+        const statusCounts = new Map<string, number>();
+        filteredPnr.forEach(row => {
+            const raw = row.statusShopee.trim().toUpperCase();
+            const translated = TRANSLATIONS[raw] || row.statusShopee;
+            statusCounts.set(translated, (statusCounts.get(translated) || 0) + 1);
+        });
+
+        return Array.from(statusCounts.entries())
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+    }, [filteredPnr]);
+
+    const RISK_COLORS = ['#BC4749', '#1B4332', '#F2A65A', '#774936', '#4A4E69', '#9A8C98'];
 
     const paginatedTable = useMemo(() => {
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -240,7 +352,7 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                 </div>
             </header>
 
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
                 <MetricCard
                     label="Total Pacotes"
                     value={stats.totalShipments.toLocaleString('pt-BR')}
@@ -272,6 +384,14 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                     gradient="from-green-50 to-white"
                     borderColor="border-green-100"
                     iconBg="bg-green-500"
+                />
+                <MetricCard
+                    label="Valor Total PNR"
+                    value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalPNRValue)}
+                    icon="payments"
+                    gradient="from-amber-50 to-white"
+                    borderColor="border-amber-100"
+                    iconBg="bg-amber-500"
                 />
             </section>
 
@@ -312,10 +432,22 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                                 <Tooltip
                                     cursor={{ fill: '#F8FAFC' }}
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                    formatter={(value: any, name: string) => [
-                                        name === 'pnrRate' ? `${Number(value).toFixed(2)}%` : value,
-                                        name === 'pnrRate' ? 'Taxa PNR' : 'Total PNR'
-                                    ]}
+                                    formatter={(value: any, name: string, props: any) => {
+                                        if (name === 'pnrRate') return [`${Number(value).toFixed(2)}%`, 'Taxa PNR'];
+                                        if (name === 'pnrCount') {
+                                            const totalValue = props.payload.totalValue || 0;
+                                            return [
+                                                <div key="custom-coord-tooltip" className="flex flex-col gap-1">
+                                                    <span className="font-bold">{value} Pacotes</span>
+                                                    <span className="text-red-500 font-extrabold text-[10px]">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)}
+                                                    </span>
+                                                </div>,
+                                                'Detalhes PNR'
+                                            ];
+                                        }
+                                        return [value, name];
+                                    }}
                                 />
                                 <Bar yAxisId="left" dataKey="pnrCount" radius={[6, 6, 0, 0]} barSize={32} name="pnrCount">
                                     {coordinatorData.map((entry, index) => (
@@ -339,14 +471,12 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart style={{ outline: 'none' }}>
                                 <Pie
-                                    data={[
-                                        { name: 'PNR', value: stats.totalFailures },
-                                        { name: 'Revertidos', value: stats.totalReverted }
-                                    ]}
+                                    data={riskData}
                                     innerRadius={65} outerRadius={85} paddingAngle={8} dataKey="value"
                                 >
-                                    <Cell fill="#BC4749" stroke="none" />
-                                    <Cell fill="#1B4332" stroke="none" />
+                                    {riskData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={RISK_COLORS[index % RISK_COLORS.length]} stroke="none" />
+                                    ))}
                                 </Pie>
                                 <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
                                 <Legend verticalAlign="bottom" height={36} iconType="circle" formatter={(value) => <span className="text-xs font-bold text-slate-600">{value}</span>} />
@@ -387,10 +517,22 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                                 <Tooltip
                                     cursor={{ fill: '#F8FAFC' }}
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                    formatter={(value: any, name: string) => [
-                                        name === 'pnrRate' ? `${Number(value).toFixed(2)}%` : value,
-                                        name === 'pnrRate' ? 'Taxa PNR' : 'Total PNR'
-                                    ]}
+                                    formatter={(value: any, name: string, props: any) => {
+                                        if (name === 'pnrRate') return [`${Number(value).toFixed(2)}%`, 'Taxa PNR'];
+                                        if (name === 'pnrCount') {
+                                            const totalValue = props.payload.totalValue || 0;
+                                            return [
+                                                <div key="custom-pnr-tooltip" className="flex flex-col gap-1">
+                                                    <span className="font-bold">{value} Pacotes</span>
+                                                    <span className="text-red-500 font-extrabold text-[10px]">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)}
+                                                    </span>
+                                                </div>,
+                                                'Detalhes PNR'
+                                            ];
+                                        }
+                                        return [value, name];
+                                    }}
                                 />
                                 <Bar yAxisId="left" dataKey="pnrCount" radius={[6, 6, 0, 0]} barSize={48} name="pnrCount">
                                     {hubPerformanceData.map((entry, index) => (
@@ -430,8 +572,10 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                             <tr className="text-[#64748B] text-[10px] font-black uppercase tracking-widest">
                                 <th className="px-8 py-5">Motorista Responsável</th>
                                 <th className="px-8 py-5">Base / Hub</th>
+                                <th className="px-8 py-5 text-center">Data do Extravio</th>
                                 <th className="px-8 py-5 text-right">Pacotes (PNR)</th>
                                 <th className="px-8 py-5 text-right">Total Pacotes</th>
+                                <th className="px-8 py-5 text-right">Valor PNR</th>
                                 <th className="px-8 py-5 text-right">PNR %</th>
                                 <th className="px-8 py-5 text-center">Meta</th>
                                 <th className="px-8 py-5 text-center">Status</th>
@@ -439,18 +583,47 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                         </thead>
                         <tbody className="divide-y divide-[#F1F5F9]">
                             {loading ? (
-                                <tr><td colSpan={7} className="px-8 py-20 text-center text-slate-400 font-bold">Carregando indicadores...</td></tr>
+                                <tr><td colSpan={9} className="px-8 py-20 text-center text-slate-400 font-bold">Carregando indicadores...</td></tr>
                             ) : paginatedTable.length === 0 ? (
-                                <tr><td colSpan={7} className="px-8 py-20 text-center text-slate-400 font-bold">Nenhum registro encontrado.</td></tr>
+                                <tr><td colSpan={9} className="px-8 py-20 text-center text-slate-400 font-bold">Nenhum registro encontrado.</td></tr>
                             ) : (
                                 paginatedTable.map((row, i) => (
                                     <tr key={i} className="hover:bg-slate-50/80 transition-all group">
-                                        <td className="px-8 py-5">
+                                        <td className="px-8 py-5 relative">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-deluna-primary text-white flex items-center justify-center text-[10px] font-black">
-                                                    {row.driver.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                                <div className="w-8 h-8 rounded-full bg-deluna-primary text-white flex items-center justify-center text-[10px] font-black group-hover:scale-110 transition-transform">
+                                                    {row.driver.split(' ').map(n => n.includes('[') ? '' : n[0]).filter(Boolean).join('').substring(0, 2).toUpperCase()}
                                                 </div>
-                                                <span className="text-sm font-extrabold text-deluna-primary">{row.driver}</span>
+                                                <div className="flex flex-col relative">
+                                                    <span className="text-sm font-extrabold text-deluna-primary cursor-help">
+                                                        {row.driver}
+                                                    </span>
+
+                                                    {/* Premium Popover no Hover */}
+                                                    <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-[100] w-[85vw] sm:min-w-[420px] max-w-[450px] bg-white rounded-xl shadow-2xl border border-slate-200 p-4 animate-in fade-in zoom-in duration-200 overflow-x-auto custom-scrollbar">
+                                                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100 min-w-[380px]">
+                                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumo de ATs ({row.atDetails.length})</span>
+                                                            <span className="text-[10px] font-bold text-deluna-primary bg-deluna-primary/5 px-2 py-0.5 rounded-full">Total: R$ {row.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                                            {row.atDetails.map((at, idx) => (
+                                                                <div key={idx} className="flex items-center justify-between text-[11px] py-1 border-b border-slate-50 last:border-0 hover:bg-slate-50 px-2 rounded-lg transition-colors min-w-[380px]">
+                                                                    <div className="flex flex-col">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="font-black text-slate-700">#{at.id}</span>
+                                                                            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded italic">{at.trackingNumber}</span>
+                                                                        </div>
+                                                                        <span className="text-[10px] text-slate-400 font-bold">{at.date !== '-' ? new Date(at.date + 'T12:00:00').toLocaleDateString('pt-BR') : 'S/Data'}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-black text-red-600">R$ {at.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                                        <span className={`w-1.5 h-1.5 rounded-full ${at.status.toUpperCase() === 'REVERSED' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-8 py-5">
@@ -458,8 +631,29 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                                                 {row.base}
                                             </span>
                                         </td>
+                                        <td className="px-8 py-5 text-center text-sm font-medium text-slate-500">
+                                            {row.date.includes('Multiplas') ? (
+                                                <span className="text-[11px] font-black text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
+                                                    {row.date}
+                                                </span>
+                                            ) : (
+                                                row.date && row.date !== '-' ? new Date(row.date + 'T12:00:00').toLocaleDateString('pt-BR') : '-'
+                                            )}
+                                        </td>
                                         <td className="px-8 py-5 text-sm text-right font-black text-red-600">{row.pnrCount}</td>
                                         <td className="px-8 py-5 text-sm text-right font-black text-slate-400">{row.totalPackets}</td>
+                                        <td className="px-8 py-5 text-sm text-right font-black text-slate-600">
+                                            {(() => {
+                                                const val = row.totalValue;
+
+                                                const formattedNum = new Intl.NumberFormat('pt-BR', {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2
+                                                }).format(val);
+
+                                                return val > 0 ? `R$ ${formattedNum}` : 'R$ 0,00';
+                                            })()}
+                                        </td>
                                         <td className="px-8 py-5 text-sm text-right">
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${row.pnrPercentage > 0.50 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                                                 {row.pnrPercentage.toFixed(2)}%

@@ -142,22 +142,28 @@ export interface ProtagonismoRow extends BaseListItem {
 }
 
 export interface PNRRow {
-  date: string;
+  date?: string;
   driver: string;
-  base: string;
+  base?: string;
   trackingNumber: string;
   statusShopee: string;
+  assignmentTaskId: string;
+  pnrOrderValue: string;       // Valor formatado para exibição (com vírgula)
+  numericValue: number;         // Valor numérico real para cálculos (parseNum)
 }
 
 export interface PNROperationalDetail {
   driver: string;
   base: string;
+  date: string;
   coordinator: string;
   pnrCount: number;
   revertedCount: number;
   totalPackets: number;
   pendingCount: number;
   pnrPercentage: number;
+  totalValue: number;
+  atDetails: Array<{ id: string, trackingNumber: string, date: string, value: number, status: string }>;
 }
 
 export interface AccessData {
