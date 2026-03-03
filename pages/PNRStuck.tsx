@@ -18,6 +18,20 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
     const [driverSearch, setDriverSearch] = useState('');
     const [chartFilterCoord, setChartFilterCoord] = useState<string | null>(null);
     const [chartFilterHub, setChartFilterHub] = useState<string | null>(null);
+    const [chartFilterStatus, setChartFilterStatus] = useState<string | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: 'pnrCount' | 'totalValue', direction: 'desc' | 'asc' }>({
+        key: 'pnrCount',
+        direction: 'desc'
+    });
+
+    const PNR_STATUS_TRANSLATIONS: Record<string, string> = {
+        'REVERSED': 'Revertido',
+        'LOST': 'Extraviado',
+        'DAMAGED': 'Avariado'
+    };
+
+    // Função interna para normalizar nome removendo o [ID]
+    const normalizeForJoin = (name: string) => name.replace(/\[.*?\]/g, '').trim().toUpperCase();
 
     useEffect(() => {
         const loadData = async () => {
@@ -80,6 +94,7 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
         setCurrentPage(1);
         setChartFilterCoord(null);
         setChartFilterHub(null);
+        setChartFilterStatus(null);
     }, [startDate, endDate, selectedHub, driverSearch]);
 
     const filteredPnr = useMemo(() => {
@@ -119,6 +134,17 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
         });
     }, [tableData, startDate, endDate, selectedHub]);
 
+    const driverMetadata = useMemo(() => {
+        const meta = new Map<string, { coordinator: string }>();
+        tableData.forEach(row => {
+            const key = normalizeForJoin(row.driver);
+            if (!meta.has(key)) {
+                meta.set(key, { coordinator: row.coordinator || 'S/C' });
+            }
+        });
+        return meta;
+    }, [tableData]);
+
     const operationalBaseData = useMemo(() => {
         const pnrGroups = new Map<string, {
             count: number,
@@ -127,13 +153,19 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
             originalBase: string,
             date: string,
             totalValue: number,
-            atDetails: Array<{ id: string, date: string, value: number, status: string }>
+            atDetails: Array<{ id: string, trackingNumber: string, date: string, value: number, status: string }>
         }>();
 
-        // Função interna para normalizar nome removendo o [ID] para fins de junção (join)
-        const normalizeForJoin = (name: string) => name.replace(/\[.*?\]/g, '').trim().toUpperCase();
+        // Filtro de Status dinâmico
+        const pnrFilteredByStatus = chartFilterStatus
+            ? filteredPnr.filter(row => {
+                const raw = row.statusShopee.trim().toUpperCase();
+                const translated = PNR_STATUS_TRANSLATIONS[raw] || row.statusShopee;
+                return translated === chartFilterStatus;
+            })
+            : filteredPnr;
 
-        filteredPnr.forEach(row => {
+        pnrFilteredByStatus.forEach(row => {
             const driverKey = normalizeForJoin(row.driver);
             const key = driverKey; // Agregação exclusiva por Motorista
 
@@ -209,7 +241,7 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                 pnrPercentage: totalPackets > 0 ? (pnrCount / totalPackets) * 100 : 0
             };
         });
-    }, [filteredPnr, filteredDelivery]);
+    }, [filteredPnr, filteredDelivery, chartFilterStatus]);
 
     const coordinatorData = useMemo(() => {
         const statsMap = new Map<string, { pnrCount: number, totalPackets: number, totalValue: number }>();
@@ -275,8 +307,19 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
         }
         return filtered
             .filter(d => d.pnrCount > 0)
-            .sort((a, b) => b.pnrCount - a.pnrCount);
-    }, [operationalBaseData, driverSearch, chartFilterCoord, chartFilterHub]);
+            .sort((a, b) => {
+                const valA = a[sortConfig.key];
+                const valB = b[sortConfig.key];
+                return sortConfig.direction === 'desc' ? valB - valA : valA - valB;
+            });
+    }, [operationalBaseData, driverSearch, chartFilterCoord, chartFilterHub, sortConfig]);
+
+    const handleSort = (key: 'pnrCount' | 'totalValue') => {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
+        }));
+    };
 
     const stats = useMemo(() => {
         const totalShipments = operationalDetails.reduce((acc, row) => acc + row.totalPackets, 0);
@@ -296,23 +339,29 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
     }, [operationalDetails]);
 
     const riskData = useMemo(() => {
-        const TRANSLATIONS: Record<string, string> = {
-            'REVERSED': 'Revertido',
-            'LOST': 'Extraviado',
-            'DAMAGED': 'Avariado'
-        };
-
         const statusCounts = new Map<string, number>();
+
+        // Para o gráfico de risco, também aplicamos os filtros de coordenador e base dos outros gráficos
+        // mas NÃO o de status para não esvaziar o próprio gráfico.
+        // Precisamos cruzar com os coordenadores que vêm do driverMetadata
+
         filteredPnr.forEach(row => {
+            const driverKey = normalizeForJoin(row.driver);
+            const meta = driverMetadata.get(driverKey);
+            const coord = meta?.coordinator || 'S/C';
+
+            if (chartFilterCoord && coord !== chartFilterCoord) return;
+            if (chartFilterHub && row.base?.trim().toUpperCase() !== chartFilterHub.trim().toUpperCase()) return;
+
             const raw = row.statusShopee.trim().toUpperCase();
-            const translated = TRANSLATIONS[raw] || row.statusShopee;
+            const translated = PNR_STATUS_TRANSLATIONS[raw] || row.statusShopee;
             statusCounts.set(translated, (statusCounts.get(translated) || 0) + 1);
         });
 
         return Array.from(statusCounts.entries())
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value);
-    }, [filteredPnr]);
+    }, [filteredPnr, driverMetadata, chartFilterCoord, chartFilterHub]);
 
     const RISK_COLORS = ['#BC4749', '#1B4332', '#F2A65A', '#774936', '#4A4E69', '#9A8C98'];
 
@@ -347,6 +396,15 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                         >
                             <span className="text-[10px] font-black text-purple-600 uppercase tracking-tight">Base: {chartFilterHub}</span>
                             <span className="material-symbols-outlined text-purple-400 text-sm">close</span>
+                        </div>
+                    )}
+                    {chartFilterStatus && (
+                        <div
+                            onClick={() => setChartFilterStatus(null)}
+                            className="bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100 shadow-sm flex items-center gap-2 cursor-pointer hover:bg-amber-100 transition-all"
+                        >
+                            <span className="text-[10px] font-black text-amber-600 uppercase tracking-tight">Status: {chartFilterStatus}</span>
+                            <span className="material-symbols-outlined text-amber-400 text-sm">close</span>
                         </div>
                     )}
                 </div>
@@ -473,9 +531,18 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                                 <Pie
                                     data={riskData}
                                     innerRadius={65} outerRadius={85} paddingAngle={8} dataKey="value"
+                                    onClick={(data: any) => {
+                                        if (data && data.name) {
+                                            setChartFilterStatus(data.name === chartFilterStatus ? null : data.name);
+                                        }
+                                    }}
                                 >
                                     {riskData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={RISK_COLORS[index % RISK_COLORS.length]} stroke="none" />
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={chartFilterStatus === entry.name ? '#000' : RISK_COLORS[index % RISK_COLORS.length]}
+                                            stroke="none"
+                                        />
                                     ))}
                                 </Pie>
                                 <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
@@ -573,9 +640,29 @@ const PNRStuck: React.FC<{ startDate: string; endDate: string }> = ({ startDate,
                                 <th className="px-8 py-5">Motorista Responsável</th>
                                 <th className="px-8 py-5">Base / Hub</th>
                                 <th className="px-8 py-5 text-center">Data do Extravio</th>
-                                <th className="px-8 py-5 text-right">Pacotes (PNR)</th>
+                                <th
+                                    className="px-8 py-5 text-right cursor-pointer hover:bg-slate-100 transition-colors"
+                                    onClick={() => handleSort('pnrCount')}
+                                >
+                                    <div className="flex items-center justify-end gap-1">
+                                        Pacotes (PNR)
+                                        <span className="material-symbols-outlined text-[14px]">
+                                            {sortConfig.key === 'pnrCount' ? (sortConfig.direction === 'desc' ? 'arrow_downward' : 'arrow_upward') : 'unfold_more'}
+                                        </span>
+                                    </div>
+                                </th>
                                 <th className="px-8 py-5 text-right">Total Pacotes</th>
-                                <th className="px-8 py-5 text-right">Valor PNR</th>
+                                <th
+                                    className="px-8 py-5 text-right cursor-pointer hover:bg-slate-100 transition-colors"
+                                    onClick={() => handleSort('totalValue')}
+                                >
+                                    <div className="flex items-center justify-end gap-1">
+                                        Valor PNR
+                                        <span className="material-symbols-outlined text-[14px]">
+                                            {sortConfig.key === 'totalValue' ? (sortConfig.direction === 'desc' ? 'arrow_downward' : 'arrow_upward') : 'unfold_more'}
+                                        </span>
+                                    </div>
+                                </th>
                                 <th className="px-8 py-5 text-right">PNR %</th>
                                 <th className="px-8 py-5 text-center">Meta</th>
                                 <th className="px-8 py-5 text-center">Status</th>
