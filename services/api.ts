@@ -219,7 +219,7 @@ export const fetchMetasData = async (url: string = GOOGLE_SCRIPT_URL): Promise<M
             }
         }
 
-        const response = await fetch(`${url}?tab=Metas`);
+        const response = await fetch(`${url}?tab=Metas&_t=${Date.now()}`);
         if (!response.ok) throw new Error(`Erro na API Metas: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
@@ -253,7 +253,7 @@ export const fetchMetasDSData = async (url: string = GOOGLE_SCRIPT_URL): Promise
             }
         }
 
-        const response = await fetch(`${url}?tab=Metas_DS`);
+        const response = await fetch(`${url}?tab=Metas_DS&_t=${Date.now()}`);
         if (!response.ok) throw new Error(`Erro na API Metas_DS: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
@@ -292,7 +292,7 @@ export const fetchMetasCaptacaoData = async (url: string = GOOGLE_SCRIPT_URL): P
             }
         }
 
-        const response = await fetch(`${url}?tab=Metas_Captacao`);
+        const response = await fetch(`${url}?tab=Metas_Captacao&_t=${Date.now()}`);
         if (!response.ok) throw new Error(`Erro na API Metas_Captacao: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
@@ -324,7 +324,7 @@ export const fetchMetaProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL)
             }
         }
 
-        const response = await fetch(`${url}?tab=Metas_Protagonismo`);
+        const response = await fetch(`${url}?tab=Metas_Protagonismo&_t=${Date.now()}`);
         if (!response.ok) throw new Error(`Erro na API Metas_Protagonismo: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
@@ -536,7 +536,7 @@ export const fetchPNRData = async (url: string = GOOGLE_SCRIPT_URL): Promise<PNR
             }
         }
 
-        const response = await fetch(`${url}?tab=PNR`);
+        const response = await fetch(`${url}?tab=PNR&_t=${Date.now()}`);
         if (!response.ok) {
             throw new Error(`Erro na API PNR: ${response.statusText}`);
         }
@@ -591,7 +591,26 @@ export const fetchPNRData = async (url: string = GOOGLE_SCRIPT_URL): Promise<PNR
                     }
                 }
 
+                // Normalização de Data para PNR (YYYY-MM-DD)
+                let rawDate = String(getVal(row, 'Date', 'Data', 'Data do Extravio', 'DATA') || '');
+                let formattedDate = '';
+                if (rawDate.includes('T')) {
+                    formattedDate = rawDate.split('T')[0];
+                } else if (rawDate.includes('/')) {
+                    const parts = rawDate.split('/');
+                    if (parts.length === 3) {
+                        const [d, m, y] = parts;
+                        formattedDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                    } else {
+                        formattedDate = rawDate;
+                    }
+                } else {
+                    formattedDate = rawDate;
+                }
+
                 return {
+                    date: formattedDate,
+                    base: String(getVal(row, 'Base', 'Hub', 'Estação', 'HUB') || '').trim(),
                     driver,
                     trackingNumber: String(getVal(row, 'SPXTN', 'SPX Tracking Number') || '').trim(),
                     statusShopee: String(getVal(row, 'Status', 'Status Shopee') || '').trim(),
@@ -628,20 +647,18 @@ export const fetchMetaPerdasData = async (url: string = GOOGLE_SCRIPT_URL): Prom
             }
         }
 
-        const response = await fetch(`${url}?tab=Meta_Perdas`);
+        const response = await fetch(`${url}?tab=Meta_Perdas&_t=${Date.now()}`);
         if (!response.ok) throw new Error(`Erro na API Meta_Perdas: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
         const processed = rawData.map(row => {
             let metaVal = parseNum(getVal(row, 'VALOR_META_PNR', 'Valor_Meta_PNR') || 0);
 
-            // CORREÇÃO: Se a meta vier como decimal (ex: 0.002 para 0.20%), convertemos para porcentagem (0.20)
-            // Assumimos que metas válidas de PNR são menores que 100%. Se for < 1, é muito provável que seja decimal.
-            // Mas cuidado: 0.5% pode vir como 0.005.
-            // Se o usuário digitou 0.20 (pensando em %), o parseNum retorna 0.20.
-            // Se digitou 0,20% (texto), o parseNum retorna 0.20 (se a regex limpar o %) ou 0.002 se o Sheets mandar raw.
-            // Vamos padronizar: se for <= 1, multiplicamos por 100.
-            if (metaVal <= 1 && metaVal > 0) {
+            // NORMALIZAÇÃO: PNR metas são geralmente muito pequenas (ex: 0.20%). 
+            // Se o valor no Sheets for decimal (ex: 0.002 para 0.2%), multiplicamos por 100.
+            // Se já for um número como 0.20, mantemos. 
+            // Usamos um threshold de 0.05 (5%) - metas de PNR raramente superam isso.
+            if (metaVal > 0 && metaVal < 0.05) {
                 metaVal = metaVal * 100;
             }
 

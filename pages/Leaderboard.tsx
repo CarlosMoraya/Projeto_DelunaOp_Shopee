@@ -121,6 +121,28 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       days.set(dayKey, dayATs);
     });
 
+    // Cruzamento de PNR com DeliveryData para obter Data e Base (necessário para o Leaderboard)
+    const normalizeId = (id: string) => String(id || '').replace(/\s+/g, '').toUpperCase();
+    const deliveryAtMap = new Map<string, DeliveryData>();
+    deliveryData.forEach(d => {
+      if (d.atCode) {
+        deliveryAtMap.set(normalizeId(d.atCode), d);
+      }
+    });
+
+    const enrichedPnr = pnrData.map(p => {
+      // Se já vier com date/base do fetch (novo recurso da API), usa o que veio. 
+      // Caso contrário, tenta o cruzamento pelo ID da tarefa.
+      if (p.date && p.base && p.date !== '-' && p.base !== 'S/B') return p;
+
+      const matched = deliveryAtMap.get(normalizeId(p.assignmentTaskId));
+      return {
+        ...p,
+        date: p.date && p.date !== '-' ? p.date : (matched ? matched.date : '-'),
+        base: p.base && p.base !== 'S/B' ? p.base : (matched ? matched.hub : 'S/B')
+      };
+    });
+
     // Calcular período
     const [y1, m1, d1] = startDate.split('-').map(Number);
     const [y2, m2, d2] = endDate.split('-').map(Number);
@@ -152,8 +174,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       const dsRate = totalRemessas > 0 ? (totalDelivered / totalRemessas) * 100 : 0;
 
       // Cálculo de Taxa PNR para Coluna Perdas (Pilar 4)
-      const basePnrData = pnrData.filter(p => {
-        const pDate = new Date(p.date).getTime();
+      const basePnrData = enrichedPnr.filter(p => {
+        const pDate = p.date ? new Date(p.date).getTime() : 0;
         return normalize(p.base) === normalizedBase && pDate >= startTime && pDate <= endTime;
       });
       const totalPnr = basePnrData.length;
@@ -245,7 +267,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
 
         if (baseMetasPerdas.length > 0) {
           if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') {
-            console.log(`DEBUG PERDAS [${normalizedBase}]: PNR_Rate=${pnrRate.toFixed(4)}% | Metas: ${baseMetasPerdas.map(m => `${m.valorMetaPNR.toFixed(2)}% (R$${m.valorPremio})`).join(' | ')}`);
+            console.log(`DEBUG PERDAS [${normalizedBase}]: PNR_Real=${pnrRate.toFixed(4)}% | PNR_Count=${totalPnr} | Remessas=${totalRemessas} | Metas_Disponiveis: ${baseMetasPerdas.map(m => `${m.valorMetaPNR}% (R$${m.valorPremio})`).join(' | ')}`);
           }
 
           const metaAtingida = baseMetasPerdas.find(m => pnrRate < m.valorMetaPNR);
