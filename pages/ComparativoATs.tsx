@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DeliveryData, QLPData, MetaGoalData } from '../types';
-import { fetchDeliveryData, fetchQLPData, fetchMetasData } from '../services/api';
+import { fetchDeliveryData, fetchQLPData, fetchMetasData, fetchBaseMetadata } from '../services/api';
 
 interface ComparativoATsProps {
   startDate: string;
@@ -27,6 +27,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
   const [qlpData, setQlpData] = useState<QLPData[]>([]);
   const [metasData, setMetasData] = useState<MetaGoalData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [baseMetadata, setBaseMetadata] = useState<{ metadataMap: Map<string, any>, normalizeBase: (s: string) => string } | null>(null);
   const [selectedCoordinator, setSelectedCoordinator] = useState<string>('');
   const [showOnlyPending, setShowOnlyPending] = useState(false);
 
@@ -34,14 +35,16 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     const loadData = async () => {
       try {
         setLoading(true);
-        const [deliveryRes, qlpRes, metasRes] = await Promise.all([
+        const [deliveryRes, qlpRes, metasRes, baseMetasRes] = await Promise.all([
           fetchDeliveryData(),
           fetchQLPData(),
-          fetchMetasData()
+          fetchMetasData(),
+          fetchBaseMetadata()
         ]);
         setAllData(deliveryRes);
         setQlpData(qlpRes);
         setMetasData(metasRes);
+        setBaseMetadata(baseMetasRes);
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
       } finally {
@@ -139,11 +142,14 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     // Processar PERÍODO ATUAL
     currentPeriodData.forEach(row => {
       const base = row.hub;
+      const normalized = baseMetadata?.normalizeBase(base) || base.toUpperCase();
+      const meta = baseMetadata?.metadataMap.get(normalized);
+
       if (!basesMap.has(base)) {
         basesMap.set(base, {
-          locality: row.locality || '',
-          leader: row.leader || '',
-          coordinator: row.coordinator || '',
+          locality: meta?.localidade || row.locality || '',
+          leader: meta?.lider || row.leader || '',
+          coordinator: meta?.coord || row.coordinator || '',
           currDaysData: new Map(),
           currTotal: 0,
           prevTotal: 0,
@@ -198,11 +204,13 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     // Consolidar totais anteriores no mapa principal
     prevBasesMap.forEach((daysMap, base) => {
       if (!basesMap.has(base)) {
+        const normalized = baseMetadata?.normalizeBase(base) || base.toUpperCase();
+        const meta = baseMetadata?.metadataMap.get(normalized);
         const sampleRow = previousPeriodData.find(r => r.hub === base);
         basesMap.set(base, {
-          locality: sampleRow?.locality || '',
-          leader: sampleRow?.leader || '',
-          coordinator: sampleRow?.coordinator || '',
+          locality: meta?.localidade || sampleRow?.locality || '',
+          leader: meta?.lider || sampleRow?.leader || '',
+          coordinator: meta?.coord || sampleRow?.coordinator || '',
           currDaysData: new Map(),
           currTotal: 0,
           prevTotal: 0,
@@ -296,7 +304,7 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
     }
 
     return finalResult.sort((a, b) => a.base.localeCompare(b.base));
-  }, [currentPeriodData, previousPeriodData, qlpCounts, metasData, startDate, endDate, showOnlyPending]);
+  }, [currentPeriodData, previousPeriodData, qlpCounts, metasData, startDate, endDate, showOnlyPending, baseMetadata]);
 
   // Calcular totais gerais
   const totals = useMemo(() => {

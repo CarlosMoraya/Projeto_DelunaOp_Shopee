@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { DeliveryData, QLPData } from '../types';
-import { fetchDeliveryData, fetchQLPData } from '../services/api';
+import { fetchDeliveryData, fetchQLPData, fetchBaseMetadata } from '../services/api';
 
 interface ComparativoProps {
   startDate: string;
@@ -25,18 +25,21 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
   const [allData, setAllData] = useState<DeliveryData[]>([]);
   const [qlpData, setQlpData] = useState<QLPData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [baseMetadata, setBaseMetadata] = useState<{ metadataMap: Map<string, any>, normalizeBase: (s: string) => string } | null>(null);
   const [selectedCoordinator, setSelectedCoordinator] = useState<string>('');
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [deliveryRes, qlpRes] = await Promise.all([
+        const [deliveryRes, qlpRes, metaRes] = await Promise.all([
           fetchDeliveryData(),
-          fetchQLPData()
+          fetchQLPData(),
+          fetchBaseMetadata()
         ]);
         setAllData(deliveryRes);
         setQlpData(qlpRes);
+        setBaseMetadata(metaRes);
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
       } finally {
@@ -134,14 +137,17 @@ const Comparativo: React.FC<ComparativoProps> = ({ startDate, endDate }) => {
     // Processar período atual
     currentPeriodData.forEach(row => {
       const base = row.hub;
+      const normalized = baseMetadata?.normalizeBase(base) || base.toUpperCase();
+      const meta = baseMetadata?.metadataMap.get(normalized);
+
       if (!basesMap.has(base)) {
         basesMap.set(base, {
-          locality: row.locality || '',
-          leader: row.leader || '',
-          coordinator: row.coordinator || '',
+          locality: meta?.localidade || row.locality || '',
+          leader: meta?.lider || row.leader || '',
+          coordinator: meta?.coord || row.coordinator || '',
           currTotalAT: 0,
           currTotalDelivered: 0,
-          currDaysData: new Map(), // Agora armazena Set de ATs
+          currDaysData: new Map(),
           prevTotalAT: 0,
           prevTotalDelivered: 0
         });
