@@ -12,6 +12,7 @@ import PNRStuck from './pages/PNRStuck';
 import Login from './pages/Login';
 import VirtualBank from './pages/VirtualBank';
 import Monitoramento from './pages/Monitoramento';
+import CapacityManagement from './pages/CapacityManagement';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DELIVERY_SUCCESS);
@@ -119,6 +120,8 @@ const App: React.FC = () => {
         return <VirtualBank startDate={startDate} endDate={endDate} />;
       case AppView.MONITORAMENTO:
         return <Monitoramento />;
+      case AppView.CAPACITY_MANAGEMENT:
+        return <CapacityManagement startDate={startDate} endDate={endDate} />;
       default:
         return <DeliverySuccess />;
     }

@@ -8,7 +8,8 @@ export enum AppView {
   COMPARATIVO_ATS = 'comparativo_ats',
   PNR_STUCK = 'pnr_stuck',
   BANCO_VIRTUAL = 'banco_virtual',
-  MONITORAMENTO = 'monitoramento'
+  MONITORAMENTO = 'monitoramento',
+  CAPACITY_MANAGEMENT = 'capacity_management'
 }
 
 export interface MetricCardProps {
@@ -93,6 +94,7 @@ export interface QLPData {
   statusQlp: string;
   driverId?: string;
   ultimaViagem?: string;
+  cpf?: string;
 }
 
 export interface MetaGoalData {
@@ -202,4 +204,16 @@ export interface MonitoramentoData {
   assignedTime: string;
   timeSinceLastDelivery: string;
   coordinator?: string;
+}
+
+export interface CapacityData {
+  name: string;
+  phone: string;
+  base: string;
+  vehicleType: string;
+  status: string;
+  dateAdded: string;
+  coordinator?: string;
+  referral?: string;
+  cpf?: string;
 }

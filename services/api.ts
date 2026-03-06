@@ -1,11 +1,11 @@
 
-import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow, AccessData, MetaPerdasData, VirtualBankData, MonitoramentoData } from '../types';
+import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, MetaProtagonismoData, ProtagonismoRow, PNRRow, AccessData, MetaPerdasData, VirtualBankData, MonitoramentoData, CapacityData } from '../types';
 
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
 
 const CACHE_KEY = 'delivery_data_cache_v6';
-const QLP_CACHE_KEY = 'qlp_data_cache_v4';
+const QLP_CACHE_KEY = 'qlp_data_cache_v5';
 const METAS_CACHE_KEY = 'metas_data_cache_v2';
 const METAS_DS_CACHE_KEY = 'metas_ds_data_cache_v1';
 const METAS_CAPTACAO_CACHE_KEY = 'metas_captacao_data_cache_v1';
@@ -14,6 +14,7 @@ const ACESSOS_CACHE_KEY = 'acessos_data_cache_v1';
 const PNR_CACHE_KEY = 'pnr_data_cache_v12';
 const METAS_PERDAS_CACHE_KEY = 'metas_perdas_data_cache_v1';
 const MONITORAMENTO_CACHE_KEY = 'monitoramento_data_cache_v1';
+const CAPACITY_CACHE_KEY = 'capacity_data_cache_v2';
 const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 horas
 
 /**
@@ -30,6 +31,7 @@ export const clearApiCache = () => {
     localStorage.removeItem(PNR_CACHE_KEY);
     localStorage.removeItem(METAS_PERDAS_CACHE_KEY);
     localStorage.removeItem(MONITORAMENTO_CACHE_KEY);
+    localStorage.removeItem(CAPACITY_CACHE_KEY);
     // Limpa versões antigas de PNR cache que podem estar ocupando espaço
     for (let i = 1; i <= 10; i++) {
         localStorage.removeItem(`pnr_data_cache_v${i}`);
@@ -68,7 +70,7 @@ export const parseNum = (val: any): number => {
 
     const num = parseFloat(clean);
     return isNaN(num) ? 0 : num;
-};
+}
 // ------------------------
 
 export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promise<DeliveryData[]> => {
@@ -383,6 +385,10 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
                 const normalizedBaseName = normalizeBase(baseName);
                 const metadata = metadataMap.get(normalizedBaseName);
 
+                // Normaliza o CPF extraindo apenas os dígitos
+                const rawCpf = String(getVal(row, 'CPF') || '');
+                const cpfDigits = rawCpf.replace(/[^\d]/g, '');
+
                 return {
                     base: baseName,
                     placa: String(getVal(row, 'PLACA') || ''),
@@ -395,7 +401,8 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
                     coordenador: metadata ? metadata.coord : '',
                     statusQlp: String(getVal(row, 'STATUS QLP', 'SITUAÇÃO QLP', 'STATUS_QLP') || ''),
                     driverId: String(getVal(row, 'Id Driver', 'ID DRIVER', 'ID_DRIVER') || '').trim(),
-                    ultimaViagem: '' // Será preenchido na UI via cruzamento
+                    ultimaViagem: '', // Será preenchido na UI via cruzamento
+                    cpf: cpfDigits
                 };
             });
 
@@ -799,6 +806,79 @@ export const fetchMonitoramentoData = async (url: string = GOOGLE_SCRIPT_URL): P
         return processed;
     } catch (error) {
         console.error("Erro ao carregar Monitoramento:", error);
+        return [];
+    }
+};
+
+export const fetchCapacityData = async (url: string = GOOGLE_SCRIPT_URL): Promise<CapacityData[]> => {
+    try {
+        const cached = localStorage.getItem(CAPACITY_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                return data;
+            }
+        }
+
+        const response = await fetch(`${url}?tab=Candidatos_Motoristas&_t=${Date.now()}`);
+        if (!response.ok) throw new Error(`Erro na API Capacity: ${response.statusText}`);
+
+        const rawData: any[] = await response.json();
+        const { metadataMap, normalizeBase } = await fetchBaseMetadata(url);
+
+        const processed = rawData
+            .filter(row => getVal(row, 'Nome', 'NOME', 'Candidato') !== '')
+            .map(row => {
+                const base = String(getVal(row, 'Base', 'BASE', 'Hub') || '').trim();
+                const normalizedBase = normalizeBase(base);
+                const metadata = metadataMap.get(normalizedBase);
+
+                const status = String(getVal(row, 'Status', 'SITUAÇÃO', 'STATUS') || 'PENDENTE');
+
+                // Normalização de Data (YYYY-MM-DD)
+                let rawDate = String(getVal(row, 'Data', 'CADASTRO', 'DATA CADASTRO', 'DATA_CADASTRO', 'DATA_DE_CADASTRO', 'Data de Cadastro', 'Carimbo de data/hora') || '');
+                let formattedDate = '';
+                if (rawDate.includes('T')) {
+                    formattedDate = rawDate.split('T')[0];
+                } else if (rawDate.includes('/')) {
+                    const parts = rawDate.split('/');
+                    if (parts.length === 3) {
+                        const [d, m, y] = parts;
+                        // Trata anos com 2 ou 4 dígitos
+                        const fullYear = y.length === 2 ? `20${y}` : y;
+                        formattedDate = `${fullYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                    } else {
+                        formattedDate = rawDate;
+                    }
+                } else {
+                    formattedDate = rawDate;
+                }
+
+                // Extração do CPF
+                const rawCpf = String(getVal(row, 'CPF') || '');
+                const cpfDigits = rawCpf.replace(/[^\d]/g, '');
+
+                return {
+                    name: String(getVal(row, 'Nome', 'NOME', 'Candidato') || 'S/N'),
+                    phone: String(getVal(row, 'Telefone', 'CELULAR', 'Contato', 'TELEFONE') || ''),
+                    base: base,
+                    vehicleType: String(getVal(row, 'Veículo', 'VEICULO', 'TIPO_VEICULO', 'TIPO DO VEÍCULO') || ''),
+                    status: status,
+                    dateAdded: formattedDate,
+                    coordinator: metadata ? metadata.coord : String(getVal(row, 'Coordenador', 'COORD') || ''),
+                    referral: String(getVal(row, 'Indicação', 'INDICACAO', 'QUEM INDICOU') || ''),
+                    cpf: cpfDigits
+                };
+            });
+
+        localStorage.setItem(CAPACITY_CACHE_KEY, JSON.stringify({
+            data: processed,
+            timestamp: Date.now()
+        }));
+
+        return processed;
+    } catch (error) {
+        console.error("Erro ao carregar dados de capacidade:", error);
         return [];
     }
 };

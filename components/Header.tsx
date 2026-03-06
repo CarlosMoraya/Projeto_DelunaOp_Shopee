@@ -75,6 +75,7 @@ const Header: React.FC<HeaderProps> = ({
       case AppView.LEADERBOARD: return <>Campanha Acelera + 30 <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Visão por Base</span></>;
       case AppView.BANCO_VIRTUAL: return <>Banco Virtual <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Acumulado de Ganhos</span></>;
       case AppView.MONITORAMENTO: return <>Monitoramento Geográfico <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Tempo Real</span></>;
+      case AppView.CAPACITY_MANAGEMENT: return <>Gestão de Capacidade <span className="hidden sm:inline text-[#64748B] font-light ml-1">/ Novos Candidatos</span></>;
     }
   };
 
