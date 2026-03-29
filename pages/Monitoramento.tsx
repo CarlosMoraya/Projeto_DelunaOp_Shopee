@@ -4,14 +4,39 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     Cell, LabelList, PieChart, Pie
 } from 'recharts';
-import { fetchMonitoramentoData } from '../services/api';
+import { fetchMonitoramentoDataBigQuery } from '../services/api';
 import { MonitoramentoData } from '../types';
+
+// Tipos da resposta da API
+interface MonitoramentoResponse {
+    metrics: {
+        totalAssigned: number;
+        totalPending: number;
+        openRoutes: number;
+        totalDrivers: number;
+        successRate: number;
+    };
+    topStations: Array<{
+        name: string;
+        originalName: string;
+        localidade: string;
+        value: number;
+    }>;
+    progressData: Array<{
+        id: string;
+        name: string;
+        value: number;
+        color: string;
+    }>;
+    rawData: MonitoramentoData[];
+}
 
 const ITEMS_PER_PAGE = 20;
 
 const COLORS = ['#1B4332', '#2D6A4F', '#40916C', '#52B788', '#74C69D', '#95D5B2', '#B7E4C7', '#D8F3DC'];
 
 const Monitoramento: React.FC = () => {
+    const [apiData, setApiData] = useState<MonitoramentoResponse | null>(null);
     const [tableData, setTableData] = useState<MonitoramentoData[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -27,12 +52,15 @@ const Monitoramento: React.FC = () => {
         const loadData = async () => {
             try {
                 setLoading(true);
-                const data = await fetchMonitoramentoData();
-                setTableData(data);
+                console.log('[Monitoramento] Buscando dados do BigQuery...');
+                const data = await fetchMonitoramentoDataBigQuery();
+                console.log('[Monitoramento] Dados recebidos:', data);
+                setApiData(data);
+                setTableData(data.rawData || []);
                 setError(null);
             } catch (err) {
                 setError('Erro ao carregar dados de monitoramento.');
-                console.error(err);
+                console.error('[Monitoramento] Erro:', err);
             } finally {
                 setLoading(false);
             }
@@ -96,6 +124,23 @@ const Monitoramento: React.FC = () => {
     }, [selectedHub, selectedCoordinator, driverSearch]);
 
     const totals = useMemo(() => {
+        console.log('[totals] apiData:', apiData);
+        console.log('[totals] apiData.metrics:', apiData?.metrics);
+
+        // Se tiver dados da API, usar métricas já calculadas
+        if (apiData?.metrics && apiData.metrics.totalAssigned > 0) {
+            console.log('[totals] Usando metrics da API:', apiData.metrics);
+            return {
+                assigned: apiData.metrics.totalAssigned.toLocaleString('pt-BR'),
+                pending: apiData.metrics.totalPending.toLocaleString('pt-BR'),
+                openRoutes: apiData.metrics.openRoutes.toLocaleString('pt-BR'),
+                successRate: apiData.metrics.successRate.toFixed(1) + '%',
+                driversCount: apiData.metrics.totalDrivers
+            };
+        }
+
+        console.log('[totals] Fallback para cálculo no frontend');
+        // Fallback: calcular no frontend (caso a API não retorne metrics)
         const assigned = filteredData.reduce((acc, row) => acc + row.assigned, 0);
         const delivered = filteredData.reduce((acc, row) => acc + row.deliveredCount, 0);
         const pending = Math.max(0, assigned - delivered);
@@ -115,9 +160,18 @@ const Monitoramento: React.FC = () => {
             successRate: successRate.toFixed(1) + '%',
             driversCount: filteredData.length
         };
-    }, [filteredData]);
+    }, [apiData?.metrics, filteredData]);
 
     const stationData = useMemo(() => {
+        // Se tiver dados da API, usar topStations já calculada
+        if (apiData?.topStations && apiData.topStations.length > 0) {
+            const sorted = [...apiData.topStations].sort((a, b) =>
+                sortOrder === 'desc' ? b.value - a.value : a.value - b.value
+            );
+            return sorted;
+        }
+
+        // Fallback: calcular no frontend
         const map = new Map<string, { total: number, delivered: number, originalName: string }>();
         filteredData.forEach(row => {
             const displayName = row.baseId || row.driverStation;
@@ -137,9 +191,15 @@ const Monitoramento: React.FC = () => {
                 value: Math.round(rate * 10) / 10
             };
         }).sort((a, b) => sortOrder === 'desc' ? b.value - a.value : a.value - b.value).slice(0, 10);
-    }, [filteredData, sortOrder]);
+    }, [apiData?.topStations, sortOrder, filteredData]);
 
     const progressData = useMemo(() => {
+        // Se tiver dados da API, usar progressData já calculado
+        if (apiData?.progressData && apiData.progressData.length > 0) {
+            return apiData.progressData;
+        }
+
+        // Fallback: calcular no frontend
         const completed = tableData.filter(row => {
             const p = parseFloat(row.deliveryProgress.replace('%', ''));
             return !isNaN(p) && p >= 100;
@@ -151,7 +211,7 @@ const Monitoramento: React.FC = () => {
             { id: 'completed', name: 'Rotas Concluídas', value: completed, color: '#1B4332' },
             { id: 'pending', name: 'Rotas em Operação', value: pending, color: '#E2E8F0' }
         ];
-    }, [tableData]);
+    }, [apiData?.progressData, tableData]);
 
     const handlePageChange = (newPage: number) => {
         if (newPage >= 1 && newPage <= totalPages) {

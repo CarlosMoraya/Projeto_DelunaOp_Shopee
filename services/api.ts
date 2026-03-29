@@ -14,8 +14,12 @@ const ACESSOS_CACHE_KEY = 'acessos_data_cache_v1';
 const PNR_CACHE_KEY = 'pnr_data_cache_v12';
 const METAS_PERDAS_CACHE_KEY = 'metas_perdas_data_cache_v1';
 const MONITORAMENTO_CACHE_KEY = 'monitoramento_data_cache_v1';
+const MONITORAMENTO_BQ_CACHE_KEY = 'monitoramento_bq_data_cache_v2';
 const CAPACITY_CACHE_KEY = 'capacity_data_cache_v2';
 const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 horas
+
+// URL da Cloud Function - atualizada após o deploy
+const MONITORAMENTO_BQ_URL = 'https://get-monitoramento-4fffvflp3q-rj.a.run.app';
 
 /**
  * Limpa todos os caches locais do sistema para forçar uma nova busca no Google Sheets.
@@ -807,6 +811,99 @@ export const fetchMonitoramentoData = async (url: string = GOOGLE_SCRIPT_URL): P
     } catch (error) {
         console.error("Erro ao carregar Monitoramento:", error);
         return [];
+    }
+};
+
+/**
+ * Busca dados de monitoramento diretamente do BigQuery via Cloud Function.
+ * Esta função faz JOIN entre shopee_monitoramento e liderancas_hub.
+ * Retorna estrutura completa com metrics, topStations, progressData e rawData.
+ * 
+ * @returns Promise com estrutura completa dos dados
+ */
+export const fetchMonitoramentoDataBigQuery = async (): Promise<{
+    metrics: {
+        totalAssigned: number;
+        totalPending: number;
+        openRoutes: number;
+        totalDrivers: number;
+        successRate: number;
+    };
+    topStations: Array<{
+        name: string;
+        originalName: string;
+        localidade: string;
+        value: number;
+    }>;
+    progressData: Array<{
+        id: string;
+        name: string;
+        value: number;
+        color: string;
+    }>;
+    rawData: MonitoramentoData[];
+}> => {
+    try {
+        const cached = localStorage.getItem(MONITORAMENTO_BQ_CACHE_KEY);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            // Cache de 30 minutos para dados do BigQuery (dados mais frescos)
+            if (Date.now() - timestamp < 30 * 60 * 1000) {
+                console.log('[BQ] Usando cache do Monitoramento');
+                return data;
+            }
+        }
+
+        console.log('[BQ] Buscando dados do Monitoramento...');
+        const response = await fetch(MONITORAMENTO_BQ_URL);
+
+        if (!response.ok) {
+            throw new Error(`Erro na API BigQuery: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+            throw new Error(result.error || 'Erro desconhecido ao buscar dados do BigQuery');
+        }
+
+        // Estrutura completa retornada pela API
+        const data = {
+            metrics: result.metrics || {
+                totalAssigned: 0,
+                totalPending: 0,
+                openRoutes: 0,
+                totalDrivers: 0,
+                successRate: 0
+            },
+            topStations: result.topStations || [],
+            progressData: result.progressData || [],
+            rawData: result.rawData || []
+        };
+
+        // Cache dos dados
+        localStorage.setItem(MONITORAMENTO_BQ_CACHE_KEY, JSON.stringify({
+            data,
+            timestamp: Date.now()
+        }));
+
+        console.log(`[BQ] ${data.rawData.length} registros de monitoramento carregados com sucesso`);
+        return data;
+
+    } catch (error) {
+        console.error("[BQ] Erro ao carregar Monitoramento:", error);
+        return {
+            metrics: {
+                totalAssigned: 0,
+                totalPending: 0,
+                openRoutes: 0,
+                totalDrivers: 0,
+                successRate: 0
+            },
+            topStations: [],
+            progressData: [],
+            rawData: []
+        };
     }
 };
 
