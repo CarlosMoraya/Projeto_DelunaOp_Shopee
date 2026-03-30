@@ -229,13 +229,18 @@ export const fetchMetasData = async (url: string = GOOGLE_SCRIPT_URL): Promise<M
         if (!response.ok) throw new Error(`Erro na API Metas: ${response.statusText}`);
 
         const rawData: any[] = await response.json();
-        const processed = rawData.map(row => ({
-            base: String(getVal(row, 'BASES') || '').trim(),
-            periodo: String(getVal(row, 'PERÍODO', 'Periodo') || '').trim(),
-            tipoMeta: Number(getVal(row, 'TIPO_META', 'Tipo_Meta') || 0),
-            valorMetaDia: parseNum(getVal(row, 'VALOR_META_DIA', 'Valor_Meta_dia') || 0),
-            valorPremio: parseNum(getVal(row, 'VALOR_PREMIO', 'Valor_Premio') || 0)
-        }));
+        const processed = rawData.map(row => {
+            const base = String(getVal(row, 'BASES', 'Bases', 'Base', 'base') || '').trim();
+            const periodo = String(getVal(row, 'PERÍODO', 'Periodo', 'PERIODO', 'periodo', 'MÊS', 'MES', 'mes') || '').trim();
+            const tipoMeta = Number(getVal(row, 'TIPO_META', 'Tipo_Meta', 'TIPO_META', 'tipo_meta', 'Faixa', 'faixa') || 0);
+            // Coluna G: Valor_Meta_Mês (meta mensal direta)
+            const valorMetaMes = parseNum(getVal(row, 'G', 'Valor_Meta_Mês', 'VALOR_META_MÊS', 'Valor_Meta_Mes', 'VALOR_META_MES', 'valor_meta_mes') || 0);
+            // Coluna H: Valor_Meta_dia (valor diário já calculado na planilha)
+            const valorMetaDia = parseNum(getVal(row, 'H', 'Valor_Meta_dia', 'VALOR_META_DIA', 'Valor_Meta_Dia', 'VALOR_META_DIA', 'valor_meta_dia') || 0);
+            const valorPremio = parseNum(getVal(row, 'VALOR_PREMIO', 'Valor_Premio', 'I', 'valor_premio') || 0);
+
+            return { base, periodo, tipoMeta, valorMetaMes, valorMetaDia, valorPremio };
+        });
 
         localStorage.setItem(METAS_CACHE_KEY, JSON.stringify({
             data: processed,

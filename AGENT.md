@@ -71,8 +71,40 @@ enum AppView {
 
 Todos os dados são obtidos de uma **Google Sheets API** via Google Apps Script:
 - **URL Base**: `https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec`
-- **Tabs principais**: `Base_Rotas`, `QLP`, `Monitoramento`, `PNR`, `Metas`, `Acessos`, etc.
+- **Tabs principais**: `Base_Rotas`, `QLP`, `Monitoramento`, `PNR`, `Metas`, `Acessos`, `Lista de Bases`, etc.
 - **Cache**: Implementado via `localStorage` com duração de 12 horas por tab
+
+### Sistema de Metas (Aba "Metas")
+
+A aba "Metas" no Google Sheets contém as configurações de metas por base e faixa de atingimento:
+
+**Estrutura das Colunas:**
+| Coluna | Campo | Descrição |
+|--------|-------|-----------|
+| A | Bases | Código do Hub (ex: LRJ12, LES03) |
+| B | Período | Mês de referência (ex: "Março", "03/2026", "MAR") |
+| F | Tipo_Meta | Faixa da meta (1, 2, 3) |
+| G | Valor_Meta_Mês | Meta mensal direta (valor absoluto) |
+| H | Valor_Meta_dia | Meta diária calculada (G ÷ dias do mês) |
+| I | Valor_Premio | Prêmio em R$ para a faixa |
+
+**Interface MetaGoalData:**
+```typescript
+export interface MetaGoalData {
+  base: string;
+  periodo: string; // Ex: "Janeiro", "Março"
+  tipoMeta: number; // 1, 2, 3
+  valorMetaDia: number; // Coluna H
+  valorMetaMes: number; // Coluna G
+  valorPremio: number; // Coluna I
+}
+```
+
+**Lógica de Cálculo:**
+- **ComparativoATs.tsx**: Meta 1 proporcional aos dias no período (`valorMetaDia * diffDays`)
+- **Leaderboard.tsx**: Cálculo progressivo para acompanhamento diário da campanha
+- Períodos que cruzam meses em ComparativoATs retornam `null` (exibe "-")
+- Suporte a múltiplos formatos de período: "Janeiro", "01/2026", "JAN/26", "MARÇO", etc.
 
 ### Autenticação
 

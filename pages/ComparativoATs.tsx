@@ -249,16 +249,42 @@ const ComparativoATs: React.FC<ComparativoATsProps> = ({ startDate, endDate }) =
       const diffTime = Math.abs(end.getTime() - start.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-      // 4. Encontrar meta
+      // 4. Encontrar meta - comparar por múltiplos formatos de período
       const normalize = (s: string) => s.toUpperCase().replace(/[\s_|-]/g, '');
       const normalizedBase = normalize(baseName);
 
-      // Usar comparação de string case-insensitive
-      const meta = metasData.find(m =>
-        normalize(m.base) === normalizedBase &&
-        m.periodo.toLowerCase() === currentMonthName.toLowerCase() &&
-        m.tipoMeta === 1
-      );
+      // Formatos possíveis na coluna PERÍODO da planilha:
+      // - "Janeiro", "Fevereiro", etc.
+      // - "01/2026", "02/2026", etc. (MM/YYYY)
+      // - "JAN/26", "FEV/26", etc.
+      const monthShortNames = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+      const monthNum = String(start.getMonth() + 1).padStart(2, '0');
+      const yearShort = String(start.getFullYear()).slice(-2);
+      const yearFull = String(start.getFullYear());
+
+      const possiblePeriodFormats = [
+        currentMonthName,                          // "Janeiro"
+        currentMonthName.toLowerCase(),            // "janeiro"
+        `${monthNum}/${yearFull}`,                 // "01/2026"
+        `${monthNum}/${yearShort}`,                // "01/26"
+        `${monthShortNames[start.getMonth()]}/${yearShort}`, // "JAN/26"
+        `${monthShortNames[start.getMonth()]}.`,   // "JAN." (com ponto)
+        monthShortNames[start.getMonth()],         // "JAN"
+      ];
+
+      // Usar comparação de string case-insensitive com múltiplos formatos
+      const meta = metasData.find(m => {
+        const normalizedBaseMatch = normalize(m.base) === normalizedBase;
+        const tipoMetaMatch = m.tipoMeta === 1;
+        const normalizedPeriodo = normalize(m.periodo);
+
+        // Verifica se o período corresponde a algum dos formatos possíveis
+        const periodoMatch = possiblePeriodFormats.some(format =>
+          normalize(format) === normalizedPeriodo
+        );
+
+        return normalizedBaseMatch && tipoMetaMatch && periodoMatch;
+      });
 
       if (!meta) return 0;
 

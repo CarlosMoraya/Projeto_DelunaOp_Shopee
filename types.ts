@@ -102,6 +102,7 @@ export interface MetaGoalData {
   periodo: string; // Ex: "Janeiro"
   tipoMeta: number;
   valorMetaDia: number;
+  valorMetaMes: number;
   valorPremio: number;
 }
 

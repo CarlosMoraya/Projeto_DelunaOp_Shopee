@@ -9,7 +9,7 @@ This file records key technical decisions, major features, and architectural cha
 - **Decision**: Created this log and updated `.cursorrules` to enforce mandatory reading of context files (`project_context.md`, `design_system.md`, and this log) before any work.
 
 ## [2026-02-21] Recent Enhancements (Context Recovery)
-- **QLP Management Charts**: 
+- **QLP Management Charts**:
     - Added interactive Donut Chart (Vehicle Types) and Bar Chart (Vehicles per Base).
     - Logic: Charts update in real-time based on sidebar filters.
 - **Leaderboard (Campanha Acelera 30+)**:
@@ -77,7 +77,7 @@ This file records key technical decisions, major features, and architectural cha
         2. `fetch_top_stations_from_bigquery()`: Top 10 estações por taxa de entrega
         3. `fetch_progress_data_from_bigquery()`: Progresso (concluídas vs pendentes)
         4. `fetch_raw_data_from_bigquery()`: Dados brutos para tabela
-    - **Frontend**: 
+    - **Frontend**:
         - `totals`: Usa `apiData.metrics` (fallback: calcula no frontend)
         - `stationData`: Usa `apiData.topStations` (fallback: calcula no frontend)
         - `progressData`: Usa `apiData.progressData` (fallback: calcula no frontend)
@@ -102,3 +102,30 @@ This file records key technical decisions, major features, and architectural cha
     - `assigned_time` válido ou inválido
     - Estar associado a um hub ou não (LEFT JOIN com `liderancas_hub`)
 - **Status**: ✅ Implementado e testado. Build aprovado.
+
+## [2026-03-29] Correção: Integração de Metas no ComparativoATs e Leaderboard
+- **Problema**:
+  - ComparativoATs não estava extraindo corretamente os valores da coluna G (`Valor_Meta_Mês`) da planilha
+  - Nomes de colunas com acentos não estavam sendo normalizados corretamente
+  - Leaderboard estava usando cálculo mensal direto em vez de progressivo
+
+- **Solução**:
+  - **types.ts**: Adicionado campo `valorMetaMes: number` à interface `MetaGoalData`
+  - **api.ts**: Atualizado `fetchMetasData` para buscar colunas G e H com múltiplas variações de nomes
+  - **ComparativoATs.tsx**: Implementada lógica de comparação com múltiplos formatos de período ("Janeiro", "01/2026", "JAN/26", etc.)
+  - **Leaderboard.tsx**: Mantido cálculo progressivo (`valorMetaDia * diffDays`) para permitir acompanhamento diário da campanha
+
+- **Decisão de Design**:
+  - O cálculo `valorMetaDia * diffDays` foi mantido intencionalmente para dar "emoção" à campanha
+  - Participantes podem verificar diariamente se estão no ritmo da meta
+  - Para ver a meta mensal completa, usuário deve selecionar período do mês inteiro (ex: 01/03 a 31/03)
+
+- **Estrutura da Planilha (Aba "Metas")**:
+  | Coluna | Campo | Tipo | Descrição |
+  |--------|-------|------|-----------|
+  | A | Bases | string | Código do Hub |
+  | B | Período | string | Mês de referência |
+  | F | Tipo_Meta | number | Faixa (1, 2, 3) |
+  | G | Valor_Meta_Mês | number | Meta mensal direta |
+  | H | Valor_Meta_dia | number | Meta diária (G ÷ dias) |
+  | I | Valor_Premio | number | Prêmio em R$ |

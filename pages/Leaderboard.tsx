@@ -66,6 +66,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
           fetchPNRData(),
           fetchMetaPerdasData()
         ]);
+
         setDeliveryData(deliveryRes);
         setMetasData(metasRes);
         setMetasDSData(metasDSRes);
@@ -181,10 +182,6 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       const totalPnr = basePnrData.length;
       const pnrRate = totalRemessas > 0 ? (totalPnr / totalRemessas) * 100 : 0;
 
-      if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') { // Bases de exemplo do print
-        console.log(`DEBUG DS [${normalizedBase}]: DS_Calculado=${dsRate.toFixed(2)}% | Remessas=${totalRemessas} | Entregues=${totalDelivered}`);
-      }
-
       // Buscar metas de volume (Meta 1, 2, 3)
       const getMetaForType = (type: number) => metasData.find(m =>
         normalize(m.base) === normalizedBase &&
@@ -196,6 +193,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
       const meta2 = getMetaForType(2);
       const meta3 = getMetaForType(3);
 
+      // Cálculo progressivo: valorMetaDia * dias decorridos no período
+      // Isso permite acompanhamento diário do progresso da campanha
       const target1 = meta1 ? Math.round(meta1.valorMetaDia * diffDays) : 0;
       const target2 = meta2 ? Math.round(meta2.valorMetaDia * diffDays) : 0;
       const target3 = meta3 ? Math.round(meta3.valorMetaDia * diffDays) : 0;
@@ -220,17 +219,12 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
         const mds2 = getMetaDS(2);
         const mds3 = getMetaDS(3);
 
-        if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') {
-          console.log(`DEBUG METAS [${normalizedBase}]: M1=${mds1?.valorMetaDS}% M2=${mds2?.valorMetaDS}% M3=${mds3?.valorMetaDS}%`);
-        }
-
         // Comparação explícita
         if (mds3 && dsRate >= mds3.valorMetaDS) operationalReward = mds3.valorPremio;
         else if (mds2 && dsRate >= mds2.valorMetaDS) operationalReward = mds2.valorPremio;
         else if (mds1 && dsRate >= mds1.valorMetaDS) operationalReward = mds1.valorPremio;
         else {
           operationalReward = 0;
-          if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') console.log(`DEBUG RESULT [${normalizedBase}]: Meta não atingida.`);
         }
       }
 
@@ -266,16 +260,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
           .sort((a, b) => a.valorMetaPNR - b.valorMetaPNR);
 
         if (baseMetasPerdas.length > 0) {
-          if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') {
-            console.log(`DEBUG PERDAS [${normalizedBase}]: PNR_Real=${pnrRate.toFixed(4)}% | PNR_Count=${totalPnr} | Remessas=${totalRemessas} | Metas_Disponiveis: ${baseMetasPerdas.map(m => `${m.valorMetaPNR}% (R$${m.valorPremio})`).join(' | ')}`);
-          }
-
           const metaAtingida = baseMetasPerdas.find(m => pnrRate < m.valorMetaPNR);
           if (metaAtingida) {
-            if (normalizedBase === 'LRJ04') console.log(`DEBUG PERDAS [LRJ04]: Atingiu meta de ${metaAtingida.valorMetaPNR}% -> R$${metaAtingida.valorPremio}`);
             perdasReward = metaAtingida.valorPremio;
           } else {
-            if (normalizedBase === 'LRJ04') console.log(`DEBUG PERDAS [LRJ04]: Nenhuma meta atingida.`);
             perdasReward = 0;
           }
         } else {
@@ -299,16 +287,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ startDate, endDate }) => {
         const mp2 = getMetaProt(2);
         const mp3 = getMetaProt(3);
 
-        if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') {
-          console.log(`DEBUG PROTAG [${normalizedBase}]: Nota=${notaProt.toFixed(2)} | Metas: M1=${mp1?.valorMetaProtagonismo} M2=${mp2?.valorMetaProtagonismo} M3=${mp3?.valorMetaProtagonismo}`);
-        }
-
         if (mp3 && notaProt >= mp3.valorMetaProtagonismo) protagonismoReward = mp3.valorPremio;
         else if (mp2 && notaProt >= mp2.valorMetaProtagonismo) protagonismoReward = mp2.valorPremio;
         else if (mp1 && notaProt >= mp1.valorMetaProtagonismo) protagonismoReward = mp1.valorPremio;
         else {
           protagonismoReward = 0;
-          if (normalizedBase === 'LRJ04' || normalizedBase === 'LRJ05') console.log(`DEBUG RESULT PROTAG [${normalizedBase}]: Meta não atingida.`);
         }
       }
 
