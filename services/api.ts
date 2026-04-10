@@ -111,8 +111,9 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
             })
             .map(row => {
                 const atQuantity = parseNum(getVal(row, 'Remessas', 'QTD_AT', 'QUANTIDADE')) || 0;
-                const delivered = parseNum(getVal(row, 'Entregues', 'ENTREGUE', 'DELIVERED')) || 0;
-                const pending = parseNum(getVal(row, 'Pendentes', 'PENDENTE', 'PENDING')) || 0;
+                const delivered = parseNum(getVal(row, 'Entregues', 'ENTREGUE', 'DELIVERED', 'Delivered', 'ENTREGUES', 'QTD_ENTREGUE', 'ENTREGUE_QTD', 'Entregue')) || 0;
+                const pending = parseNum(getVal(row, 'Pendentes', 'PENDENTE', 'PENDING', 'QTD_PENDENTE', 'PENDENTES')) || 0;
+                const failures = parseNum(getVal(row, 'Insucessos', 'INSUCESSOS', 'FAILURES', 'Falhas', 'INSUCESSO', 'FAILURE')) || 0;
 
                 let rate = 0;
                 if (atQuantity > 0) {
@@ -129,10 +130,13 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
                     status = 'ABAIXO DA META';
                 }
 
-                // Normalizar data (YYYY-MM-DD ou DD/MM/YYYY)
+                // Normalizar data (YYYY-MM-DD ou DD/MM/YYYY ou ISO com timezone)
                 let rawDate = String(getVal(row, 'Date', 'DATA') || '');
                 let formattedDate = '';
+
                 if (rawDate.includes('T')) {
+                    // Formato ISO com timezone: 2025-12-01T03:00:00.000Z
+                    // Extrair apenas a parte da data (YYYY-MM-DD) preservando o dia local
                     formattedDate = rawDate.split('T')[0];
                 } else if (rawDate.includes('/')) {
                     // Tenta converter DD/MM/YYYY para YYYY-MM-DD
@@ -144,6 +148,7 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
                         formattedDate = rawDate;
                     }
                 } else {
+                    // Já está no formato YYYY-MM-DD ou outro formato
                     formattedDate = rawDate;
                 }
 
@@ -158,7 +163,7 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
                     locality: String(getVal(row, 'Localidade', 'LOCAL', 'CIDADE') || ''),
                     atCode: String(getVal(row, 'AT', 'COD_AT') || ''),
                     atQuantity: atQuantity,
-                    failures: Math.max(0, atQuantity - delivered),
+                    failures: failures > 0 ? failures : Math.max(0, atQuantity - delivered),
                     delivered: delivered,
                     pending: pending,
                     successRate: rate,

@@ -71,15 +71,30 @@ const App: React.FC = () => {
     return (cached && cachedVersion === 'v6') ? cached : '';
   });
 
-  // Sincronização definitiva: Busca a data mais recente
+  // Sincronização definitiva: Busca a data mais recente e define um período completo
   const syncDatesWithLatestData = async () => {
+    // Previne múltiplas chamadas
+    const syncLock = sessionStorage.getItem('deluna_sync_lock');
+    if (syncLock === 'true') {
+      setIsSyncingDate(false);
+      return;
+    }
+
     try {
+      // Define lock para evitar loop
+      sessionStorage.setItem('deluna_sync_lock', 'true');
+
       const { fetchDeliveryData } = await import('./services/api');
       const data = await fetchDeliveryData();
+
       if (data && data.length > 0) {
+        // Dados já vêm ordenados por data decrescente (mais recente primeiro)
         const latestDate = data[0].date;
+        const oldestDate = data[data.length - 1].date;
+
         if (latestDate) {
-          setStartDate(latestDate);
+          // Define o período completo (da data mais antiga à mais recente)
+          setStartDate(oldestDate);
           setEndDate(latestDate);
           sessionStorage.setItem('deluna_sync_end_date', latestDate);
           sessionStorage.setItem('deluna_data_version', 'v6');
@@ -88,6 +103,8 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Erro ao sincronizar datas:", err);
     } finally {
+      // Remove o lock e finaliza a sincronização
+      sessionStorage.removeItem('deluna_sync_lock');
       setIsSyncingDate(false);
     }
   };
@@ -132,7 +149,7 @@ const App: React.FC = () => {
     setIsSidebarOpen(false); // Fecha a sidebar no mobile após navegar
   };
 
-  if (checkingAuth || isSyncingDate) {
+  if (checkingAuth || (isAuthenticated && isSyncingDate)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <div className="flex flex-col items-center gap-4">
