@@ -435,7 +435,7 @@ export const fetchQLPData = async (url: string = GOOGLE_SCRIPT_URL): Promise<QLP
 export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Promise<any[]> => {
     try {
         // OTIMIZAÇÃO: Usa o novo recurso do Script para trazer as duas abas em um único request (Batching)
-        const tabs = encodeURIComponent('Lista de Bases,Respostas');
+        const tabs = encodeURIComponent('Lista de Bases,Respostas_Protagonismo');
         const batchUrl = `${url}?tabs=${tabs}`;
         console.log("DEBUG Protagonismo: Iniciando batch fetch...", batchUrl);
 
@@ -444,7 +444,7 @@ export const fetchProtagonismoData = async (url: string = GOOGLE_SCRIPT_URL): Pr
 
         const result = await res.json();
         const rawBases = result['Lista de Bases'];
-        const rawNotes = result['Respostas'];
+        const rawNotes = result['Respostas_Protagonismo'];
 
         if (!Array.isArray(rawBases)) {
             throw new Error(`Aba 'Lista de Bases' não retornou uma lista válida.`);
