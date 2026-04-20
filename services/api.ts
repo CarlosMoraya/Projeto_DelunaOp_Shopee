@@ -4,7 +4,7 @@ import { DeliveryData, QLPData, MetaGoalData, MetaDSData, MetaCaptacaoData, Meta
 // URL fixa por enquanto, o usuário deve substituir depois ou configurar via .env
 export const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyVb9TMALRPhF5ir1h_A6DY3w03F8H88owvGz4d_oTaYzVv_y3oPOSL9LTu26IS_DGng/exec';
 
-const CACHE_KEY = 'delivery_data_cache_v6';
+const CACHE_KEY = 'delivery_data_cache_v7';
 const QLP_CACHE_KEY = 'qlp_data_cache_v5';
 const METAS_CACHE_KEY = 'metas_data_cache_v2';
 const METAS_DS_CACHE_KEY = 'metas_ds_data_cache_v1';
@@ -167,6 +167,7 @@ export const fetchDeliveryData = async (url: string = GOOGLE_SCRIPT_URL): Promis
                     delivered: delivered,
                     pending: pending,
                     successRate: rate,
+                    week: String(getVal(row, 'Semana', 'SEMANA', 'WEEK', 'Semana do Ano') || '').trim(),
                     status: status
                 };
             })

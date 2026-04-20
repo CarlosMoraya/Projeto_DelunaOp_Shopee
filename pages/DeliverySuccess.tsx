@@ -203,19 +203,26 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
         label = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
         sortKey = row.date;
       } else if (historyRange === 'week') {
-        // Calcular início da semana (domingo)
-        const day = date.getDay();
-        const diff = date.getDate() - day;
-        const startOfWeek = new Date(date);
-        startOfWeek.setDate(diff);
-        startOfWeek.setHours(0, 0, 0, 0);
+        // Usar a semana da planilha (ex: W16) se disponível
+        if (row.week) {
+          groupKey = row.week;
+          label = row.week;
+          sortKey = row.week;
+        } else {
+          // Fallback: calcular início da semana (domingo)
+          const day = date.getDay();
+          const diff = date.getDate() - day;
+          const startOfWeek = new Date(date);
+          startOfWeek.setDate(diff);
+          startOfWeek.setHours(0, 0, 0, 0);
 
-        groupKey = `W-${startOfWeek.getFullYear()}-${startOfWeek.getMonth()}-${startOfWeek.getDate()}`;
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
+          groupKey = `W-${startOfWeek.getFullYear()}-${startOfWeek.getMonth()}-${startOfWeek.getDate()}`;
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
 
-        label = `Sem ${startOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-        sortKey = startOfWeek.toISOString().split('T')[0];
+          label = `Sem ${startOfWeek.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+          sortKey = startOfWeek.toISOString().split('T')[0];
+        }
       } else if (historyRange === 'month') {
         groupKey = `${date.getFullYear()}-${date.getMonth()}`;
         label = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).toUpperCase();
@@ -258,7 +265,12 @@ const DeliverySuccess: React.FC<{ startDate: string; endDate: string }> = ({ sta
       if (historyRange === 'day') {
         displayLabel = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       } else if (historyRange === 'week') {
-        displayLabel = `W${getWeekNumber(d)}`;
+        // Se a chave já contém W (ex: W16), usa diretamente
+        if (key.startsWith('W')) {
+          displayLabel = key;
+        } else {
+          displayLabel = `W${getWeekNumber(d)}`;
+        }
       } else if (historyRange === 'month') {
         displayLabel = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).toUpperCase();
       }

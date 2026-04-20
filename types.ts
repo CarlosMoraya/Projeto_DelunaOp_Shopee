@@ -62,7 +62,7 @@ export interface RawDeliveryRow {
 export interface DeliveryData {
   date: string;
   id: string;
-  driverId?: string; // Novo campo: Id Driver (cruza com QLP)
+  driverId?: string;
   driver: string;
   hub: string;
   coordinator: string;
@@ -74,6 +74,7 @@ export interface DeliveryData {
   delivered: number;
   pending: number;
   successRate: number;
+  week?: string; // Semana da planilha (ex: W16)
   status: 'META ALCANÇADA' | 'PRÓX DA META' | 'ABAIXO DA META';
 }
 
